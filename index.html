@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Smart Home - Telegram WebApp</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body { font-family: Inter, Arial; padding: 14px; background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); }
+    .row { display:flex; gap:10px; margin:8px 0; align-items:center; }
+    button { padding:8px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600; }
+    .toggle { min-width:120px; }
+    .status { margin-top:10px; font-size:0.95rem; color:gray; }
+    .big { font-size:1.05rem; font-weight:700; margin-bottom:6px; }
+  </style>
+</head>
+<body>
+  <div class="big">Smart Home Dashboard</div>
+
+  <div class="row">
+    <button class="toggle" onclick="sendCmd('relay1_toggle')">Relay 1</button>
+    <button class="toggle" onclick="sendCmd('relay2_toggle')">Relay 2</button>
+    <button class="toggle" onclick="sendCmd('relay3_toggle')">Relay 3</button>
+    <button class="toggle" onclick="sendCmd('relay4_toggle')">Relay 4</button>
+  </div>
+
+  <div style="margin-top:12px;">
+    <label for="curtain">Curtain position: <span id="curtainVal">50%</span></label>
+    <input id="curtain" type="range" min="0" max="100" value="50" oninput="updateCurtain(this.value)" />
+    <div style="margin-top:6px;">
+      <button onclick="sendCmd('curtain_open')">Open</button>
+      <button onclick="sendCmd('curtain_close')">Close</button>
+      <button onclick="sendCmd('curtain_stop')">Stop</button>
+    </div>
+  </div>
+
+  <div class="status" id="status">Ready</div>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  try { tg.expand(); } catch(e){}
+
+  function sendCmd(cmd) {
+    // sendData is received by your bot as web_app_data
+    tg.sendData(cmd);
+    document.getElementById('status').innerText = 'Sent: ' + cmd + ' — waiting for device...';
+  }
+
+  function updateCurtain(v){
+    document.getElementById('curtainVal').innerText = v + '%';
+    // send only when release? we'll send on input so device gets continuous updates
+    tg.sendData('curtain_' + v);
+    document.getElementById('status').innerText = 'Sent curtain: ' + v + '%';
+  }
+</script>
+</body>
+</html>
