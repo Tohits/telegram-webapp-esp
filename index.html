@@ -1,37 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Smart Controller</title>
-<style>
-button { padding:10px; margin:5px; font-size:16px; }
-</style>
+  <title>Motor Control</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+    input[type=range] { width: 80%; }
+    button { padding: 10px 20px; margin: 5px; font-size: 16px; }
+    #pos { font-weight: bold; }
+  </style>
 </head>
 <body>
-<h1>Motor Control</h1>
-<input type="range" min="0" max="100" id="motorSlider" oninput="setMotor(this.value)">
-<p id="motorValue">0%</p>
+  <h1>Motor Control</h1>
+  <p>Current Position: <span id="pos">0</span>%</p>
+  
+  <input type="range" id="slider" min="0" max="100" step="25" value="0">
+  <p id="sliderValue">0%</p>
+  
+  <div>
+    <button onclick="moveTo(0)">Close</button>
+    <button onclick="moveTo(25)">25%</button>
+    <button onclick="moveTo(50)">50%</button>
+    <button onclick="moveTo(75)">75%</button>
+    <button onclick="moveTo(100)">Open</button>
+  </div>
+  
+  <div>
+    <button onclick="step(-25)">-25%</button>
+    <button onclick="step(25)">+25%</button>
+  </div>
 
-<h2>Relay Control</h2>
-<button onclick="toggleRelay(1,1)">Relay 1 ON</button>
-<button onclick="toggleRelay(1,0)">Relay 1 OFF</button><br>
-<button onclick="toggleRelay(2,1)">Relay 2 ON</button>
-<button onclick="toggleRelay(2,0)">Relay 2 OFF</button><br>
-<button onclick="toggleRelay(3,1)">Relay 3 ON</button>
-<button onclick="toggleRelay(3,0)">Relay 3 OFF</button><br>
-<button onclick="toggleRelay(4,1)">Relay 4 ON</button>
-<button onclick="toggleRelay(4,0)">Relay 4 OFF</button>
+  <script>
+    const ESP_IP = "http://10.252.140.41"; // Change to your ESP's public/WAN IP or DDNS
+    let currentPos = 0;
 
-<script>
-const masterIP = "192.168.1.40"; // Change to Master IP
+    function moveTo(target) {
+      if (target < 0) target = 0;
+      if (target > 100) target = 100;
+      if (target !== currentPos) {
+        fetch(`${ESP_IP}/setPosition?value=${target}`)
+          .then(() => updatePosition());
+      }
+    }
 
-function setMotor(val) {
-  document.getElementById("motorValue").innerText = val + "%";
-  fetch(`http://${masterIP}/motor?pos=${val}`);
-}
+    function step(change) {
+      let newPos = currentPos + change;
+      if (newPos < 0) newPos = 0;
+      if (newPos > 100) newPos = 100;
+      moveTo(newPos);
+    }
 
-function toggleRelay(ch, state) {
-  fetch(`http://${masterIP}/relay?ch=${ch}&state=${state}`);
-}
-</script>
+    function updatePosition() {
+      fetch(`${ESP_IP}/getPosition`)
+        .then(res => res.json())
+        .then(data => {
+          currentPos = data.position;
+          document.getElementById("pos").textContent = currentPos;
+          document.getElementById("slider").value = currentPos;
+          document.getElementById("sliderValue").textContent = currentPos + "%";
+        })
+        .catch(err => console.error("Error:", err));
+    }
+
+    document.getElementById("slider").addEventListener("input", function() {
+      document.getElementById("sliderValue").textContent = this.value + "%";
+    });
+
+    document.getElementById("slider").addEventListener("change", function() {
+      moveTo(parseInt(this.value));
+    });
+
+    setInterval(updatePosition, 1000); // Update position every second
+    updatePosition();
+  </script>
 </body>
 </html>
