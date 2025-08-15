@@ -1,58 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Curtain Control</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #1c1c1c;
-      color: white;
-      text-align: center;
-      padding: 20px;
-    }
-    input[type=range] {
-      width: 80%;
-      margin-top: 50px;
-    }
-    #value {
-      font-size: 24px;
-      margin-top: 10px;
-    }
-    button {
-      background: #0088cc;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      font-size: 18px;
-      border-radius: 5px;
-      margin-top: 20px;
-    }
-  </style>
+<title>ESP Control</title>
+<style>
+body { font-family: Arial; text-align: center; background: #f2f2f2; }
+button { padding: 10px; margin: 5px; font-size: 16px; }
+input[type=range] { width: 80%; }
+</style>
 </head>
 <body>
-  <h1>Curtain Control</h1>
-  <input type="range" min="0" max="100" value="50" id="slider">
-  <div id="value">50%</div>
-  <button onclick="sendValue()">Send</button>
+<h1>ESP Control Panel</h1>
 
-  <script>
-    let tg = window.Telegram.WebApp;
-    tg.expand();
+<h3>Motor Control</h3>
+<input type="range" min="0" max="255" id="motorSlider" oninput="updateMotor(this.value)">
+<p id="motorValue">Speed: 0</p>
 
-    let slider = document.getElementById("slider");
-    let valueDisplay = document.getElementById("value");
+<h3>Relays</h3>
+<div>
+  <button onclick="toggleRelay(1,1)">Relay 1 ON</button>
+  <button onclick="toggleRelay(1,0)">Relay 1 OFF</button>
+</div>
+<div>
+  <button onclick="toggleRelay(2,1)">Relay 2 ON</button>
+  <button onclick="toggleRelay(2,0)">Relay 2 OFF</button>
+</div>
+<div>
+  <button onclick="toggleRelay(3,1)">Relay 3 ON</button>
+  <button onclick="toggleRelay(3,0)">Relay 3 OFF</button>
+</div>
+<div>
+  <button onclick="toggleRelay(4,1)">Relay 4 ON</button>
+  <button onclick="toggleRelay(4,0)">Relay 4 OFF</button>
+</div>
 
-    slider.oninput = function() {
-      valueDisplay.textContent = slider.value + "%";
-    };
+<h3>Sensor Data</h3>
+<p id="rain">Rain: Loading...</p>
+<p id="water">Water Level: Loading...</p>
 
-    function sendValue() {
-      tg.sendData(slider.value); // Sends slider value back to bot
-      tg.close();
-    }
-  </script>
+<script>
+let masterIP = "192.168.1.40"; // Change to your Master ESP IP
+
+function updateMotor(value) {
+  document.getElementById("motorValue").innerText = "Speed: " + value;
+  fetch(`http://${masterIP}/motor?speed=${value}`);
+}
+
+function toggleRelay(ch, state) {
+  fetch(`http://${masterIP}/relay?ch=${ch}&state=${state}`);
+}
+
+function fetchSensors() {
+  fetch(`http://${masterIP}/sensors`)
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById("rain").innerText = "Rain: " + (data.rain ? "Dry" : "Wet");
+    document.getElementById("water").innerText = "Water Level: " + data.water + " cm";
+  });
+}
+setInterval(fetchSensors, 2000);
+</script>
 </body>
 </html>
