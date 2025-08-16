@@ -1,63 +1,69 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MQTT Motor Control</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <title>Motor Control via MQTT</title>
+  <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
 </head>
 <body>
-  <h2>Motor Control Panel</h2>
+  <h2>Motor Control</h2>
+
   <button onclick="sendCommand('forward')">Forward</button>
   <button onclick="sendCommand('backward')">Backward</button>
   <button onclick="sendCommand('stop')">Stop</button>
-  <p id="status">Connecting to MQTT...</p>
+
+  <p id="status">Status: Not connected</p>
 
   <script>
+    // MQTT broker
     const broker = "broker.hivemq.com";
-    const port = 8884;   // Secure WebSocket port
+    const port = 8000; // WebSocket port
+
+    // Topics
     const topic = "tohid/motor";
+    const statusTopic = "tohid/motor/status";
 
-    let client = new Paho.MQTT.Client(broker, port, "webClient-" + Math.random());
+    // Create client
+    const clientID = "webclient_" + parseInt(Math.random() * 100, 10);
+    const client = new Paho.MQTT.Client(broker, port, clientID);
 
-    client.onConnectionLost = (responseObject) => {
-      document.getElementById("status").innerText = "Connection lost: " + responseObject.errorMessage;
-      // Auto reconnect after 3s
-      setTimeout(connectMQTT, 3000);
-    };
-
-    client.onMessageArrived = (message) => {
-      document.getElementById("status").innerText = "Received: " + message.payloadString;
-    };
-
-    function connectMQTT() {
-      client.connect({
-        useSSL: true,
-        timeout: 5,
-        keepAliveInterval: 30,   // ✅ keep connection alive
-        cleanSession: true,
-        onSuccess: () => {
-          document.getElementById("status").innerText = "Connected to MQTT";
-          client.subscribe(topic, {qos: 1});  // ✅ subscribe with QoS 1
-        },
-        onFailure: (err) => {
-          document.getElementById("status").innerText = "Failed to connect: " + JSON.stringify(err);
-          // Retry
-          setTimeout(connectMQTT, 3000);
-        }
-      });
-    }
-
-    connectMQTT();
-
-    function sendCommand(cmd) {
-      if (client.isConnected()) {
-        let message = new Paho.MQTT.Message(cmd);
-        message.destinationName = topic;
-        message.qos = 1;   // ✅ reliable delivery
-        client.send(message);
-        document.getElementById("status").innerText = "Sent: " + cmd;
-      } else {
-        document.getElementById("status").innerText = "Not connected!";
+    // Connect
+    client.connect({
+      onSuccess: function () {
+        console.log("Connected to broker");
+        document.getElementById("status").innerText = "Connected to broker";
+        client.subscribe(topic, { qos: 1 });
+        client.subscribe(statusTopic, { qos: 1 });
+      },
+      onFailure: function (err) {
+        console.log("Failed to connect:", err);
+        document.getElementById("status").innerText = "Failed to connect";
       }
+    });
+
+    // Connection lost
+    client.onConnectionLost = function (responseObject) {
+      if (responseObject.errorCode !== 0) {
+        console.log("Connection lost:", responseObject.errorMessage);
+        document.getElementById("status").innerText = "Connection lost";
+      }
+    };
+
+    // Handle incoming messages
+    client.onMessageArrived = function (message) {
+      console.log("Message arrived: " + message.payloadString);
+
+      if (message.destinationName === statusTopic) {
+        document.getElementById("status").innerText =
+          "ESP says: " + message.payloadString;
+      }
+    };
+
+    // Send commands
+    function sendCommand(cmd) {
+      const message = new Paho.MQTT.Message(cmd);
+      message.destinationName = topic;
+      client.send(message);
+      console.log("Sent: " + cmd);
     }
   </script>
 </body>
