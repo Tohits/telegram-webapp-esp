@@ -1,83 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Motor Position Control</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 520px; margin: 24px auto; }
-    .card { padding:16px; border:1px solid #eee; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,.06); }
-    .row { display:flex; align-items:center; gap:12px; }
-    .big { font-size: 1.25rem; }
-    input[type=range]{ width:100%; }
-    .status { margin-top:8px; opacity:.8; }
-  </style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Home Control</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+body{font-family:sans-serif;background:#e0f7fa;padding:10px;}
+.card{background:#fff;padding:20px;margin:10px auto;border-radius:10px;max-width:500px;box-shadow:0 4px 8px rgba(0,0,0,0.1);}
+input[type=range]{width:90%;}
+</style>
 </head>
 <body>
-  <h2>Motor Position Control (MQTT)</h2>
-  <div class="card">
-    <div class="row">
-      <input id="slider" type="range" min="0" max="100" value="0" oninput="onSlide(this.value)" />
-      <div class="big"><span id="pct">0</span>%</div>
-    </div>
-    <button onclick="send()">Send Target</button>
-    <div class="status">
-      Broker: <span id="conn">Connecting…</span><br/>
-      State: <span id="state">—</span><br/>
-      Live position: <span id="live">—</span>%
-    </div>
-  </div>
 
-  <script>
-    // --- HiveMQ Cloud WebSocket config ---
-    const url = "wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt";
-    const options = {
-      username: "tohits",
-      password: "toh123@TOH",
-      clean: true,
-      connectTimeout: 5000,
-      reconnectPeriod: 3000,
-      clientId: "web_" + Math.random().toString(16).slice(2, 10),
-    };
+<div class="card">
+<h2>Status</h2>
+<p>Water: <span id="water">--</span>%</p>
+<p>Rain: <span id="rain">--</span></p>
+<p>Motor Pulse: <span id="pulse">--</span></p>
+</div>
 
-    const TOPIC_TARGET  = "motor/targetPercent";
-    const TOPIC_PERCENT = "motor/percent";
-    const TOPIC_STATE   = "motor/state";
+<div class="card">
+<h2>Curtains Control</h2>
+<input type="range" min="0" max="100" value="0" id="curtainSlider">
+<p>Selected: <span id="curtainVal">0%</span></p>
+</div>
 
-    const client = mqtt.connect(url, options);
+<div class="card">
+<h2>Relays</h2>
+<div>
+<label>Relay 1: <input type="checkbox" id="relay1"></label>
+<label>Relay 2: <input type="checkbox" id="relay2"></label>
+<label>Relay 3: <input type="checkbox" id="relay3"></label>
+<label>Relay 4: <input type="checkbox" id="relay4"></label>
+</div>
+</div>
 
-    client.on("connect", () => {
-      document.getElementById("conn").innerText = "Connected";
-      client.subscribe([TOPIC_PERCENT, TOPIC_STATE]);
-    });
+<script>
+const broker = "93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud";
+const port = 8000;
+const client = mqtt.connect(`wss://${broker}:${port}`, {username:"tohits", password:"toh123@TOH"});
 
-    client.on("reconnect", () => {
-      document.getElementById("conn").innerText = "Reconnecting…";
-    });
+client.on('connect', () => {
+  console.log("Connected to MQTT");
+  client.subscribe("home/waterlevel");
+  client.subscribe("home/rain");
+});
 
-    client.on("error", (e) => {
-      document.getElementById("conn").innerText = "Error";
-      console.error(e);
-    });
+client.on('message', (topic, message) => {
+  const msg = message.toString();
+  if(topic=="home/waterlevel") document.getElementById('water').innerText = msg;
+  if(topic=="home/rain") document.getElementById('rain').innerText = msg;
+});
 
-    client.on("message", (topic, payload) => {
-      const msg = payload.toString();
-      if (topic === TOPIC_PERCENT) {
-        document.getElementById("live").innerText = msg;
-      } else if (topic === TOPIC_STATE) {
-        document.getElementById("state").innerText = msg;
-      }
-    });
+document.getElementById('curtainSlider').addEventListener('input', e=>{
+  document.getElementById('curtainVal').innerText = e.target.value + "%";
+  client.publish('home/curtain', e.target.value);
+});
 
-    let target = 0;
-    function onSlide(val) {
-      target = parseInt(val, 10);
-      document.getElementById("pct").innerText = target;
-    }
-
-    function send() {
-      client.publish(TOPIC_TARGET, String(target));
-    }
-  </script>
+['relay1','relay2','relay3','relay4'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', e=>{
+    client.publish('home/'+id, e.target.checked?"ON":"OFF");
+  });
+});
+</script>
 </body>
 </html>
