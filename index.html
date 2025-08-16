@@ -1,43 +1,47 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ESP Control</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Motor Control via MQTT</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; background: #e0f7fa; padding: 20px; text-align: center; }
+    input[type=range]{ width: 80%; height: 40px; margin: 20px auto; }
+    h2 { color: #00796B; }
+  </style>
+  <script src="https://unpkg.com/paho-mqtt/paho-mqtt.js"></script>
 </head>
 <body>
-  <h2>ESP Control Panel</h2>
-  
-  <!-- Relay buttons -->
-  <button onclick="sendCommand('ON')">Turn Relay ON</button>
-  <button onclick="sendCommand('OFF')">Turn Relay OFF</button>
-  <br><br>
-  
-  <!-- Motor slider -->
-  <label>Motor %:</label>
-  <input type="range" id="motorSlider" min="0" max="100" value="0" oninput="sendMotor(this.value)">
-  <span id="motorValue">0%</span>
+  <h2>Motor Control</h2>
+  <p>Use slider to set curtain position (%)</p>
+  <input type="range" min="0" max="100" value="0" id="motorSlider" oninput="sendMotor()">
+  <p>Selected: <span id="percentLabel">0</span>%</p>
 
   <script>
-    // Connect to HiveMQ WebSocket
-    const client = new Paho.MQTT.Client("93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud", 8000, "webClient_" + Math.random());
+    // MQTT setup
+    const broker = "93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud";
+    const port = 8884; // WSS secure websocket port for HiveMQ Cloud
+    const clientId = "webClient_" + Math.floor(Math.random() * 1000);
+    const username = "tohits";
+    const password = "toh123@TOH";
+
+    const client = new Paho.MQTT.Client(broker, port, clientId);
 
     client.connect({
-      userName: "tohits",
-      password: "toh123@TOH",
-      onSuccess: () => { console.log("Connected to MQTT!"); },
-      onFailure: (err) => { console.log("Connection failed:", err); }
+      useSSL: true,
+      userName: username,
+      password: password,
+      onSuccess: () => console.log("Connected to MQTT Broker!"),
+      onFailure: (err) => console.error("MQTT connect failed:", err)
     });
 
-    function sendCommand(command) {
-      const message = new Paho.MQTT.Message(command);
-      message.destinationName = "home/esp1/command";
-      client.send(message);
-    }
+    function sendMotor() {
+      const slider = document.getElementById("motorSlider");
+      const percent = slider.value;
+      document.getElementById("percentLabel").innerText = percent;
 
-    function sendMotor(value) {
-      document.getElementById("motorValue").innerText = value + "%";
-      const message = new Paho.MQTT.Message("MOTOR:" + value);
-      message.destinationName = "home/esp1/command";
+      const message = new Paho.MQTT.Message(percent.toString());
+      message.destinationName = "home/curtain";
       client.send(message);
     }
   </script>
