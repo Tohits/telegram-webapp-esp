@@ -1,83 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>ESP Motor Control</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f3f3f3;
-      text-align: center;
-      padding: 40px;
-    }
-    h2 {
-      color: #333;
-    }
-    button {
-      padding: 15px 30px;
-      margin: 10px;
-      font-size: 18px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    .forward { background: #4CAF50; color: white; }
-    .backward { background: #2196F3; color: white; }
-    .stop { background: #f44336; color: white; }
-    button:hover { opacity: 0.8; }
-
-    #status {
-      margin-top: 20px;
-      font-size: 18px;
-      font-weight: bold;
-    }
-    .connected { color: green; }
-    .disconnected { color: red; }
-    .reconnecting { color: orange; }
-  </style>
+  <title>MQTT Motor Control</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 </head>
 <body>
-  <h2>ESP Motor Control (via MQTT)</h2>
-  <button class="forward" onclick="sendCommand('forward')">Forward</button>
-  <button class="backward" onclick="sendCommand('backward')">Backward</button>
-  <button class="stop" onclick="sendCommand('stop')">Stop</button>
-  
-  <div id="status" class="disconnected">🔴 Disconnected from MQTT broker</div>
+  <h2>Motor Control Panel</h2>
+  <button onclick="sendCommand('forward')">Forward</button>
+  <button onclick="sendCommand('backward')">Backward</button>
+  <button onclick="sendCommand('stop')">Stop</button>
+  <p id="status">Connecting to MQTT...</p>
 
   <script>
-    // MQTT broker settings
-    const broker = "wss://broker.hivemq.com:8083/mqtt";
-    const topic = "esp/motor";
+    const broker = "broker.hivemq.com";
+    const port = 8000; // WebSocket port for browser
+    const topic = "tohid/motor";
 
-    // Connect to broker
-    const client = mqtt.connect(broker);
+    let client = new Paho.MQTT.Client(broker, port, "webClient-" + Math.random());
 
-    client.on("connect", () => {
-      document.getElementById("status").innerHTML = "🟢 Connected to MQTT broker";
-      document.getElementById("status").className = "connected";
-      console.log("Connected");
-    });
+    client.onConnectionLost = () => {
+      document.getElementById("status").innerText = "Connection lost";
+    };
 
-    client.on("reconnect", () => {
-      document.getElementById("status").innerHTML = "⏳ Reconnecting...";
-      document.getElementById("status").className = "reconnecting";
-    });
+    client.onMessageArrived = (message) => {
+      document.getElementById("status").innerText = "Received: " + message.payloadString;
+    };
 
-    client.on("close", () => {
-      document.getElementById("status").innerHTML = "🔴 Disconnected from MQTT broker";
-      document.getElementById("status").className = "disconnected";
-    });
-
-    client.on("error", (err) => {
-      console.error("Connection error: ", err);
+    client.connect({
+      onSuccess: () => {
+        document.getElementById("status").innerText = "Connected to MQTT";
+      }
     });
 
     function sendCommand(cmd) {
-      client.publish(topic, cmd);
-      console.log("Sent:", cmd);
-      document.getElementById("status").innerText = "📤 Sent: " + cmd + " (still connected)";
+      let message = new Paho.MQTT.Message(cmd);
+      message.destinationName = topic;
+      client.send(message);
+      document.getElementById("status").innerText = "Sent: " + cmd;
     }
   </script>
 </body>
