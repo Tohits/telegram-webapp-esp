@@ -12,37 +12,52 @@
   <p id="status">Connecting to MQTT...</p>
 
   <script>
-    // ✅ Use HiveMQ public broker WebSocket Secure (wss)
     const broker = "broker.hivemq.com";
-    const port = 8884;   // secure websocket port
+    const port = 8884;   // Secure WebSocket port
     const topic = "tohid/motor";
 
-    // Use SSL secure connection
     let client = new Paho.MQTT.Client(broker, port, "webClient-" + Math.random());
 
     client.onConnectionLost = (responseObject) => {
       document.getElementById("status").innerText = "Connection lost: " + responseObject.errorMessage;
+      // Auto reconnect after 3s
+      setTimeout(connectMQTT, 3000);
     };
 
     client.onMessageArrived = (message) => {
       document.getElementById("status").innerText = "Received: " + message.payloadString;
     };
 
-    client.connect({
-      useSSL: true,   // ✅ important for GitHub-hosted pages
-      onSuccess: () => {
-        document.getElementById("status").innerText = "Connected to MQTT";
-      },
-      onFailure: (err) => {
-        document.getElementById("status").innerText = "Failed to connect: " + JSON.stringify(err);
-      }
-    });
+    function connectMQTT() {
+      client.connect({
+        useSSL: true,
+        timeout: 5,
+        keepAliveInterval: 30,   // ✅ keep connection alive
+        cleanSession: true,
+        onSuccess: () => {
+          document.getElementById("status").innerText = "Connected to MQTT";
+          client.subscribe(topic, {qos: 1});  // ✅ subscribe with QoS 1
+        },
+        onFailure: (err) => {
+          document.getElementById("status").innerText = "Failed to connect: " + JSON.stringify(err);
+          // Retry
+          setTimeout(connectMQTT, 3000);
+        }
+      });
+    }
+
+    connectMQTT();
 
     function sendCommand(cmd) {
-      let message = new Paho.MQTT.Message(cmd);
-      message.destinationName = topic;
-      client.send(message);
-      document.getElementById("status").innerText = "Sent: " + cmd;
+      if (client.isConnected()) {
+        let message = new Paho.MQTT.Message(cmd);
+        message.destinationName = topic;
+        message.qos = 1;   // ✅ reliable delivery
+        client.send(message);
+        document.getElementById("status").innerText = "Sent: " + cmd;
+      } else {
+        document.getElementById("status").innerText = "Not connected!";
+      }
     }
   </script>
 </body>
