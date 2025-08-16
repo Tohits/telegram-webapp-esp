@@ -1,45 +1,82 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>MQTT Motor Control</title>
+  <meta charset="UTF-8" />
+  <title>Motor Position Control</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 520px; margin: 24px auto; }
+    .card { padding:16px; border:1px solid #eee; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,.06); }
+    .row { display:flex; align-items:center; gap:12px; }
+    .big { font-size: 1.25rem; }
+    input[type=range]{ width:100%; }
+    .status { margin-top:8px; opacity:.8; }
+  </style>
 </head>
 <body>
-  <h2>MQTT Motor Control</h2>
-  <button onclick="sendCommand('forward')">Forward</button>
-  <button onclick="sendCommand('backward')">Backward</button>
-  <button onclick="sendCommand('stop')">Stop</button>
-  <br><br>
-  <input type="range" min="0" max="1023" value="0" id="slider" oninput="sendSlider(this.value)">
-  <p>Speed: <span id="speedVal">0</span></p>
+  <h2>Motor Position Control (MQTT)</h2>
+  <div class="card">
+    <div class="row">
+      <input id="slider" type="range" min="0" max="100" value="0" oninput="onSlide(this.value)" />
+      <div class="big"><span id="pct">0</span>%</div>
+    </div>
+    <button onclick="send()">Send Target</button>
+    <div class="status">
+      Broker: <span id="conn">Connecting…</span><br/>
+      State: <span id="state">—</span><br/>
+      Live position: <span id="live">—</span>%
+    </div>
+  </div>
 
   <script>
-    // HiveMQ Cloud broker (WebSocket)
+    // --- HiveMQ Cloud WebSocket config ---
+    const url = "wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt";
     const options = {
-      username: "tohits",  // your HiveMQ username
-      password: "toh123@TOH",  // your HiveMQ password
+      username: "tohits",
+      password: "toh123@TOH",
       clean: true,
-      connectTimeout: 4000,
-      reconnectPeriod: 5000,
+      connectTimeout: 5000,
+      reconnectPeriod: 3000,
+      clientId: "web_" + Math.random().toString(16).slice(2, 10),
     };
 
-    const client = mqtt.connect("wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt", options);
+    const TOPIC_TARGET  = "motor/targetPercent";
+    const TOPIC_PERCENT = "motor/percent";
+    const TOPIC_STATE   = "motor/state";
+
+    const client = mqtt.connect(url, options);
 
     client.on("connect", () => {
-      console.log("Connected to MQTT broker");
+      document.getElementById("conn").innerText = "Connected";
+      client.subscribe([TOPIC_PERCENT, TOPIC_STATE]);
     });
 
-    client.on("error", (err) => {
-      console.error("Connection failed:", err);
+    client.on("reconnect", () => {
+      document.getElementById("conn").innerText = "Reconnecting…";
     });
 
-    function sendCommand(cmd) {
-      client.publish("motor/cmd", cmd);
+    client.on("error", (e) => {
+      document.getElementById("conn").innerText = "Error";
+      console.error(e);
+    });
+
+    client.on("message", (topic, payload) => {
+      const msg = payload.toString();
+      if (topic === TOPIC_PERCENT) {
+        document.getElementById("live").innerText = msg;
+      } else if (topic === TOPIC_STATE) {
+        document.getElementById("state").innerText = msg;
+      }
+    });
+
+    let target = 0;
+    function onSlide(val) {
+      target = parseInt(val, 10);
+      document.getElementById("pct").innerText = target;
     }
 
-    function sendSlider(val) {
-      document.getElementById("speedVal").innerText = val;
-      client.publish("motor/slider", val);
+    function send() {
+      client.publish(TOPIC_TARGET, String(target));
     }
   </script>
 </body>
