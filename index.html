@@ -1,76 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motor Control</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-    input[type=range] { width: 80%; }
-    button { padding: 10px 20px; margin: 5px; font-size: 16px; }
-    #pos { font-weight: bold; }
-  </style>
+  <title>ESP Control</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
 </head>
 <body>
-  <h1>Motor Control</h1>
-  <p>Current Position: <span id="pos">0</span>%</p>
+  <h2>ESP Control Panel</h2>
   
-  <input type="range" id="slider" min="0" max="100" step="25" value="0">
-  <p id="sliderValue">0%</p>
+  <!-- Relay buttons -->
+  <button onclick="sendCommand('ON')">Turn Relay ON</button>
+  <button onclick="sendCommand('OFF')">Turn Relay OFF</button>
+  <br><br>
   
-  <div>
-    <button onclick="moveTo(0)">Close</button>
-    <button onclick="moveTo(25)">25%</button>
-    <button onclick="moveTo(50)">50%</button>
-    <button onclick="moveTo(75)">75%</button>
-    <button onclick="moveTo(100)">Open</button>
-  </div>
-  
-  <div>
-    <button onclick="step(-25)">-25%</button>
-    <button onclick="step(25)">+25%</button>
-  </div>
+  <!-- Motor slider -->
+  <label>Motor %:</label>
+  <input type="range" id="motorSlider" min="0" max="100" value="0" oninput="sendMotor(this.value)">
+  <span id="motorValue">0%</span>
 
   <script>
-    const ESP_IP = "http://10.252.140.41"; // Change to your ESP's public/WAN IP or DDNS
-    let currentPos = 0;
+    // Connect to HiveMQ WebSocket
+    const client = new Paho.MQTT.Client("93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud", 8000, "webClient_" + Math.random());
 
-    function moveTo(target) {
-      if (target < 0) target = 0;
-      if (target > 100) target = 100;
-      if (target !== currentPos) {
-        fetch(`${ESP_IP}/setPosition?value=${target}`)
-          .then(() => updatePosition());
-      }
-    }
-
-    function step(change) {
-      let newPos = currentPos + change;
-      if (newPos < 0) newPos = 0;
-      if (newPos > 100) newPos = 100;
-      moveTo(newPos);
-    }
-
-    function updatePosition() {
-      fetch(`${ESP_IP}/getPosition`)
-        .then(res => res.json())
-        .then(data => {
-          currentPos = data.position;
-          document.getElementById("pos").textContent = currentPos;
-          document.getElementById("slider").value = currentPos;
-          document.getElementById("sliderValue").textContent = currentPos + "%";
-        })
-        .catch(err => console.error("Error:", err));
-    }
-
-    document.getElementById("slider").addEventListener("input", function() {
-      document.getElementById("sliderValue").textContent = this.value + "%";
+    client.connect({
+      userName: "tohits",
+      password: "toh123@TOH",
+      onSuccess: () => { console.log("Connected to MQTT!"); },
+      onFailure: (err) => { console.log("Connection failed:", err); }
     });
 
-    document.getElementById("slider").addEventListener("change", function() {
-      moveTo(parseInt(this.value));
-    });
+    function sendCommand(command) {
+      const message = new Paho.MQTT.Message(command);
+      message.destinationName = "home/esp1/command";
+      client.send(message);
+    }
 
-    setInterval(updatePosition, 1000); // Update position every second
-    updatePosition();
+    function sendMotor(value) {
+      document.getElementById("motorValue").innerText = value + "%";
+      const message = new Paho.MQTT.Message("MOTOR:" + value);
+      message.destinationName = "home/esp1/command";
+      client.send(message);
+    }
   </script>
 </body>
 </html>
