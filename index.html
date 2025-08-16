@@ -1,69 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motor Control via MQTT</title>
+  <meta charset="UTF-8">
+  <title>ESP Motor Control</title>
   <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 40px;
+    }
+    h1 {
+      color: #333;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      color: blue;
+    }
+  </style>
 </head>
 <body>
-  <h2>Motor Control</h2>
+  <h1>ESP Motor Control via MQTT</h1>
+  <button onclick="sendCommand('UP')">Motor UP</button>
+  <button onclick="sendCommand('DOWN')">Motor DOWN</button>
+  <button onclick="sendCommand('STOP')">Motor STOP</button>
 
-  <button onclick="sendCommand('forward')">Forward</button>
-  <button onclick="sendCommand('backward')">Backward</button>
-  <button onclick="sendCommand('stop')">Stop</button>
-
-  <p id="status">Status: Not connected</p>
+  <p id="status">Connecting to MQTT...</p>
 
   <script>
-    // MQTT broker
+    // ✅ HiveMQ secure WebSocket
     const broker = "broker.hivemq.com";
-    const port = 8000; // WebSocket port
+    const port = 8884; 
+    const clientID = "webclient_" + Math.floor(Math.random() * 10000);
 
-    // Topics
-    const topic = "tohid/motor";
-    const statusTopic = "tohid/motor/status";
+    // Create client with secure WebSocket
+    const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
 
-    // Create client
-    const clientID = "webclient_" + parseInt(Math.random() * 100, 10);
-    const client = new Paho.MQTT.Client(broker, port, clientID);
+    // Set callback handlers
+    client.onConnectionLost = function(responseObject) {
+      document.getElementById("status").innerText = "❌ Connection lost";
+    };
+    client.onMessageArrived = function(message) {
+      console.log("Message received:", message.destinationName, message.payloadString);
+    };
+
+    // Connect options
+    const options = {
+      useSSL: true, // ✅ Required for wss
+      timeout: 5,
+      onSuccess: function() {
+        document.getElementById("status").innerText = "✅ Connected to MQTT broker";
+        client.subscribe("esp/motor/status");
+      },
+      onFailure: function(message) {
+        document.getElementById("status").innerText = "❌ Connection failed: " + message.errorMessage;
+      }
+    };
 
     // Connect
-    client.connect({
-      onSuccess: function () {
-        console.log("Connected to broker");
-        document.getElementById("status").innerText = "Connected to broker";
-        client.subscribe(topic, { qos: 1 });
-        client.subscribe(statusTopic, { qos: 1 });
-      },
-      onFailure: function (err) {
-        console.log("Failed to connect:", err);
-        document.getElementById("status").innerText = "Failed to connect";
-      }
-    });
+    client.connect(options);
 
-    // Connection lost
-    client.onConnectionLost = function (responseObject) {
-      if (responseObject.errorCode !== 0) {
-        console.log("Connection lost:", responseObject.errorMessage);
-        document.getElementById("status").innerText = "Connection lost";
-      }
-    };
-
-    // Handle incoming messages
-    client.onMessageArrived = function (message) {
-      console.log("Message arrived: " + message.payloadString);
-
-      if (message.destinationName === statusTopic) {
-        document.getElementById("status").innerText =
-          "ESP says: " + message.payloadString;
-      }
-    };
-
-    // Send commands
+    // Function to send MQTT messages
     function sendCommand(cmd) {
       const message = new Paho.MQTT.Message(cmd);
-      message.destinationName = topic;
+      message.destinationName = "esp/motor/control";
       client.send(message);
-      console.log("Sent: " + cmd);
+      console.log("Sent:", cmd);
     }
   </script>
 </body>
