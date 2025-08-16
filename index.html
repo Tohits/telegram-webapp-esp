@@ -1,29 +1,60 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Motor Control</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <meta charset="utf-8">
+  <title>ESP Motor Control via MQTT</title>
+  <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 40px; }
+    h1 { color: #333; }
+    .slider { width: 80%; margin: 20px; }
+  </style>
 </head>
 <body>
-  <h2>Motor Control</h2>
-  <input type="range" id="slider" min="0" max="100" value="0">
-  <span id="val">0%</span>
+  <h1>Motor Control</h1>
+
+  <input type="range" min="0" max="100" value="0" class="slider" id="motorSlider" oninput="updateMotor(this.value)">
+  <p>Motor Position: <span id="motorValue">0</span>%</p>
 
   <script>
-    const client = mqtt.connect("wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt", {
-      username: "tohits",
-      password: "toh123@TOH"
+    // ==== MQTT CONFIG ====
+    const broker = "93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud";  // Replace with your broker
+    const port = 8883;                   // WebSocket port (usually 8000/8083)
+    const topicMotor = "esp/motor";
+
+    // ==== MQTT Client ====
+    const clientID = "webClient-" + Math.floor(Math.random() * 10000);
+    const client = new Paho.MQTT.Client(broker, port, clientID);
+
+    client.onConnectionLost = function(response) {
+      console.log("Connection lost: " + response.errorMessage);
+    };
+    client.onMessageArrived = function(message) {
+      console.log("Received: " + message.destinationName + " → " + message.payloadString);
+    };
+
+    client.connect({
+      onSuccess: function() {
+        console.log("Connected to MQTT broker");
+        client.subscribe(topicMotor);
+      },
+      onFailure: function(e) {
+        console.log("Failed to connect: " + e.errorMessage);
+      }
     });
 
-    client.on("connect", () => console.log("Connected to MQTT broker"));
+    // ==== FUNCTIONS ====
+    function sendMessage(topic, msg) {
+      const message = new Paho.MQTT.Message(msg);
+      message.destinationName = topic;
+      client.send(message);
+      console.log("Sent: " + topic + " → " + msg);
+    }
 
-    const slider = document.getElementById("slider");
-    const val = document.getElementById("val");
-
-    slider.addEventListener("input", () => {
-      val.textContent = slider.value + "%";
-      client.publish("esp/motor", slider.value);
-    });
+    function updateMotor(val) {
+      document.getElementById("motorValue").innerText = val;
+      sendMessage(topicMotor, val);
+    }
   </script>
 </body>
 </html>
