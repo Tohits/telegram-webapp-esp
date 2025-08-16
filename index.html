@@ -1,85 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
   <title>ESP Motor Control</title>
-  <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 40px;
-    }
-    h1 {
-      color: #333;
-    }
-    button {
-      padding: 10px 20px;
-      margin: 10px;
-      font-size: 16px;
-      cursor: pointer;
-      border-radius: 8px;
-      border: none;
-      background: #4CAF50;
-      color: white;
-      transition: 0.3s;
-    }
-    button:hover {
-      background: #45a049;
-    }
-    #status {
-      margin-top: 20px;
-      font-weight: bold;
-      color: blue;
-    }
-  </style>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
-  <h1>ESP Motor Control via MQTT</h1>
-  <button onclick="sendCommand('UP')">Motor UP</button>
-  <button onclick="sendCommand('DOWN')">Motor DOWN</button>
-  <button onclick="sendCommand('STOP')">Motor STOP</button>
+  <h2>Motor Control via MQTT</h2>
+  <button onclick="sendCommand('motor_on')">ON</button>
+  <button onclick="sendCommand('motor_off')">OFF</button>
 
-  <p id="status">Connecting to MQTT...</p>
+  <p id="status">Connecting...</p>
 
   <script>
-    // ✅ HiveMQ secure WebSocket
-    const broker = "broker.hivemq.com";
-    const port = 8884; 
-    const clientID = "webclient_" + Math.floor(Math.random() * 10000);
-
-    // Create client with secure WebSocket
-    const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientID);
-
-    // Set callback handlers
-    client.onConnectionLost = function(responseObject) {
-      document.getElementById("status").innerText = "❌ Connection lost";
-    };
-    client.onMessageArrived = function(message) {
-      console.log("Message received:", message.destinationName, message.payloadString);
-    };
-
-    // Connect options
     const options = {
-      useSSL: true, // ✅ Required for wss
-      timeout: 5,
-      onSuccess: function() {
-        document.getElementById("status").innerText = "✅ Connected to MQTT broker";
-        client.subscribe("esp/motor/status");
-      },
-      onFailure: function(message) {
-        document.getElementById("status").innerText = "❌ Connection failed: " + message.errorMessage;
-      }
+      clean: true,
+      connectTimeout: 4000,
+      clientId: 'webclient_' + Math.random().toString(16).substr(2, 8),
+      username: 'tohits',     // your HiveMQ username
+      password: 'toh123@TOH'  // your HiveMQ password
     };
 
-    // Connect
-    client.connect(options);
+    const client  = mqtt.connect('wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt', options);
 
-    // Function to send MQTT messages
+    client.on('connect', () => {
+      document.getElementById("status").innerText = "Connected to HiveMQ!";
+      console.log("Connected");
+    });
+
+    client.on('error', (err) => {
+      document.getElementById("status").innerText = "Connection error!";
+      console.error(err);
+    });
+
     function sendCommand(cmd) {
-      const message = new Paho.MQTT.Message(cmd);
-      message.destinationName = "esp/motor/control";
-      client.send(message);
+      client.publish("esp/motor", cmd);
       console.log("Sent:", cmd);
     }
   </script>
