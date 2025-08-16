@@ -1,40 +1,78 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ESP Motor Control</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <title>MQTT Motor Control</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
 </head>
 <body>
-  <h2>Motor Control via MQTT</h2>
-  <button onclick="sendCommand('motor_on')">ON</button>
-  <button onclick="sendCommand('motor_off')">OFF</button>
+  <h2>MQTT Motor Control</h2>
 
-  <p id="status">Connecting...</p>
+  <!-- Buttons for motor control -->
+  <button onclick="sendCommand('motor/forward')">Forward</button>
+  <button onclick="sendCommand('motor/backward')">Backward</button>
+  <button onclick="sendCommand('motor/stop')">Stop</button>
+  
+  <br><br>
+
+  <!-- Slider for motor control -->
+  <label for="motorSlider">Motor Speed/Position: </label>
+  <input type="range" min="0" max="100" value="0" id="motorSlider" oninput="updateSlider(this.value)">
+  <span id="sliderValue">0</span>%
+  <br>
+  <button onclick="sendSlider()">Set Value</button>
+
+  <p id="status">Connecting to MQTT...</p>
 
   <script>
-    const options = {
-      clean: true,
-      connectTimeout: 4000,
-      clientId: 'webclient_' + Math.random().toString(16).substr(2, 8),
-      username: 'tohits',     // your HiveMQ username
-      password: 'toh123@TOH'  // your HiveMQ password
+    const broker = "93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud";  // HiveMQ cluster
+    const port = 8884;   // Secure WebSocket port
+    const clientId = "webclient_" + parseInt(Math.random() * 100, 10);
+
+    // MQTT client
+    const client = new Paho.MQTT.Client(broker, port, clientId);
+
+    client.onConnectionLost = (responseObject) => {
+      document.getElementById("status").innerText = "Connection lost: " + responseObject.errorMessage;
     };
 
-    const client  = mqtt.connect('wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt', options);
+    client.onMessageArrived = (message) => {
+      console.log("Received: " + message.destinationName + " -> " + message.payloadString);
+    };
 
-    client.on('connect', () => {
-      document.getElementById("status").innerText = "Connected to HiveMQ!";
-      console.log("Connected");
-    });
+    // Connect options
+    const options = {
+      useSSL: true,
+      userName: "tohits",       // your HiveMQ username
+      password: "toh123@TOH",   // your HiveMQ password
+      onSuccess: () => {
+        document.getElementById("status").innerText = "Connected to MQTT broker!";
+      },
+      onFailure: (error) => {
+        document.getElementById("status").innerText = "Failed to connect: " + error.errorMessage;
+      }
+    };
 
-    client.on('error', (err) => {
-      document.getElementById("status").innerText = "Connection error!";
-      console.error(err);
-    });
+    client.connect(options);
 
-    function sendCommand(cmd) {
-      client.publish("esp/motor", cmd);
-      console.log("Sent:", cmd);
+    // Send motor command
+    function sendCommand(topic) {
+      const message = new Paho.MQTT.Message("1");
+      message.destinationName = topic;
+      client.send(message);
+    }
+
+    // Slider functions
+    let sliderVal = 0;
+    function updateSlider(val) {
+      sliderVal = val;
+      document.getElementById("sliderValue").innerText = val;
+    }
+
+    function sendSlider() {
+      const message = new Paho.MQTT.Message(sliderVal.toString());
+      message.destinationName = "motor/slider";
+      client.send(message);
+      console.log("Sent slider value: " + sliderVal);
     }
   </script>
 </body>
