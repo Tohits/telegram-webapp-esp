@@ -24,12 +24,12 @@
   <p id="status">Connecting to MQTT...</p>
 
   <script>
-    const broker = "93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud";  // HiveMQ cluster
+    const broker = "93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud";
     const port = 8884;   // Secure WebSocket port
     const clientId = "webclient_" + parseInt(Math.random() * 100, 10);
 
-    // MQTT client
-    const client = new Paho.MQTT.Client(broker, port, clientId);
+    // --- FIX: specify WebSocket path "/mqtt" ---
+    const client = new Paho.MQTT.Client(broker, port, "/mqtt", clientId);
 
     client.onConnectionLost = (responseObject) => {
       document.getElementById("status").innerText = "Connection lost: " + responseObject.errorMessage;
@@ -45,10 +45,10 @@
       userName: "tohits",       // your HiveMQ username
       password: "toh123@TOH",   // your HiveMQ password
       onSuccess: () => {
-        document.getElementById("status").innerText = "Connected to MQTT broker!";
+        document.getElementById("status").innerText = "✅ Connected to MQTT broker!";
       },
       onFailure: (error) => {
-        document.getElementById("status").innerText = "Failed to connect: " + error.errorMessage;
+        document.getElementById("status").innerText = "❌ Failed to connect: " + error.errorMessage;
       }
     };
 
