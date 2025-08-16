@@ -2,89 +2,99 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Smart Home Control</title>
+  <title>Smart Control - MQTT</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    body { font-family: sans-serif; background:#e0f7fa; padding:20px; }
-    .card { background:#fff; padding:20px; margin:10px auto; border-radius:10px; max-width:500px; box-shadow:0 4px 8px rgba(0,0,0,0.1); }
-    input[type=range] { width:90%; height:45px; background:#ddd; border-radius:20px; outline:none; margin:10px auto; display:block; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:45px; height:45px; background:#2196F3; border-radius:50%; cursor:pointer; box-shadow:0 0 4px rgba(0,0,0,0.4); }
-    .switch { position:relative; display:inline-block; width:60px; height:34px; }
-    .switch input { opacity:0; width:0; height:0; }
-    .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px; }
-    .slider:before { position:absolute; content:''; height:26px; width:26px; left:4px; bottom:4px; background-color:white; transition:.4s; border-radius:50%; }
+    body { font-family: sans-serif; background: #e0f7fa; padding: 10px; }
+    .card { background: #fff; padding: 20px; margin: 10px auto; border-radius: 10px; max-width: 500px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px; }
+    .slider:before { position: absolute; content: ''; height:26px; width:26px; left:4px; bottom:4px; background-color:white; transition:.4s; border-radius:50%; }
     input:checked + .slider { background-color:#2196F3; }
-    input:checked + .slider:before { transform:translateX(26px); }
-    .relay-container { display:flex; flex-direction:column; gap:15px; }
-    .relay-row { display:flex; align-items:center; justify-content:space-between; }
-    .relay-label { flex:1; font-size:16px; }
+    input:checked + .slider:before { transform: translateX(26px); }
+    input[type=range]{ -webkit-appearance:none; width:90%; height:45px; background:#ddd; border-radius:20px; outline:none; margin:10px auto; display:block; }
+    input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:45px; height:45px; background:#2196F3; border-radius:50%; cursor:pointer; box-shadow:0 0 4px rgba(0,0,0,0.4);}
+    input[type=range]::-moz-range-thumb{ width:45px; height:45px; background:#2196F3; border:none; border-radius:50%; cursor:pointer; }
+    .relay-container{ display:flex; flex-direction:column; gap:15px; }
+    .relay-row{ display:flex; align-items:center; justify-content:space-between; }
+    .relay-label{ flex:1; font-size:16px; }
+    #mqttStatus { font-weight:bold; }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>MQTT Status: <span id="mqttStatus">Connecting...</span></h2>
-    <h3>Water Level: <span id="waterLevel">--</span></h3>
-    <h3>Rain: <span id="rainStatus">--</span></h3>
   </div>
 
   <div class="card">
-    <h2>Curtain Control</h2>
-    <input type="range" min="0" max="100" value="0" id="curtainSlider" oninput="publishCurtain(this.value)">
-    <p style="text-align:center">Selected: <span id="curtainVal">0%</span></p>
+    <h2>Status</h2>
+    <p id="level">Water: --</p>
+    <p id="rain">Rain: --</p>
+    <p>Pulse: <span id="pulse">--</span></p>
   </div>
 
   <div class="card">
-    <h2>Relays</h2>
+    <h2>Curtains Control</h2>
+    <input type="range" min="0" max="100" value="0" id="curtainSlider" oninput="slideChange(this.value)">
+    <p style="text-align:center">Selected: <span id="percentLabel">0%</span></p>
+  </div>
+
+  <div class="card">
+    <h2>Electricity Control</h2>
     <div class="relay-container">
-      <div class="relay-row"><span class="relay-label">Inverter Light 1</span><label class="switch"><input type="checkbox" id="relay1" onchange="toggleRelay(1)"><span class="slider"></span></label></div>
-      <div class="relay-row"><span class="relay-label">Inverter Light 2</span><label class="switch"><input type="checkbox" id="relay2" onchange="toggleRelay(2)"><span class="slider"></span></label></div>
-      <div class="relay-row"><span class="relay-label">Main Light 1</span><label class="switch"><input type="checkbox" id="relay3" onchange="toggleRelay(3)"><span class="slider"></span></label></div>
-      <div class="relay-row"><span class="relay-label">Main Light 2</span><label class="switch"><input type="checkbox" id="relay4" onchange="toggleRelay(4)"><span class="slider"></span></label></div>
+      <div class="relay-row"><span class="relay-label">Inverter Light 1:</span><label class="switch"><input type="checkbox" id="relay1" onchange="toggleRelay(1)"><span class="slider"></span></label></div>
+      <div class="relay-row"><span class="relay-label">Inverter Light 2:</span><label class="switch"><input type="checkbox" id="relay2" onchange="toggleRelay(2)"><span class="slider"></span></label></div>
+      <div class="relay-row"><span class="relay-label">Main Light 1:</span><label class="switch"><input type="checkbox" id="relay3" onchange="toggleRelay(3)"><span class="slider"></span></label></div>
+      <div class="relay-row"><span class="relay-label">Main Light 2:</span><label class="switch"><input type="checkbox" id="relay4" onchange="toggleRelay(4)"><span class="slider"></span></label></div>
     </div>
   </div>
 
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script>
-    const client = mqtt.connect('wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8883', {
+    // HiveMQ Cloud secure WebSocket connection
+    const client = mqtt.connect('wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884', {
       username: 'tohits',
-      password: 'toh123@TOH'
+      password: 'toh123@TOH',
+      reconnectPeriod: 5000
     });
 
-    client.on('connect', function () {
+    client.on('connect', () => {
       document.getElementById('mqttStatus').innerText = 'Connected';
-      // Subscribe to sensor & relay topics
-      client.subscribe('home/water');
-      client.subscribe('home/rain');
-      for(let i=1;i<=4;i++) client.subscribe('home/relay'+i);
+      // Subscribe to all necessary topics
+      for (let i=1; i<=4; i++) client.subscribe('home/relay'+i);
       client.subscribe('home/curtain');
+      client.subscribe('home/status');
     });
 
-    client.on('error', function(err) {
-      document.getElementById('mqttStatus').innerText = 'Error';
-      console.error(err);
-    });
+    client.on('reconnect', () => { document.getElementById('mqttStatus').innerText = 'Reconnecting...'; });
+    client.on('close', () => { document.getElementById('mqttStatus').innerText = 'Disconnected'; });
+    client.on('error', () => { document.getElementById('mqttStatus').innerText = 'Error'; });
 
-    client.on('message', function(topic, message) {
+    client.on('message', (topic, message) => {
       const msg = message.toString();
-      if(topic === 'home/water') document.getElementById('waterLevel').innerText = msg;
-      if(topic === 'home/rain') document.getElementById('rainStatus').innerText = msg;
-      if(topic === 'home/curtain') {
+      if(topic.startsWith('home/relay')) {
+        let idx = parseInt(topic.slice(-1));
+        document.getElementById('relay'+idx).checked = (msg === 'ON');
+      } else if(topic === 'home/curtain') {
         document.getElementById('curtainSlider').value = msg;
-        document.getElementById('curtainVal').innerText = msg + '%';
-      }
-      for(let i=1;i<=4;i++) {
-        if(topic === 'home/relay'+i) document.getElementById('relay'+i).checked = (msg === 'ON');
+        document.getElementById('percentLabel').innerText = msg+'%';
+      } else if(topic === 'home/status') {
+        const [water,rain,pulse] = msg.split('|');
+        document.getElementById('level').innerText = water;
+        document.getElementById('rain').innerText = rain;
+        document.getElementById('pulse').innerText = pulse;
       }
     });
-
-    function publishCurtain(val) {
-      client.publish('home/curtain', val);
-      document.getElementById('curtainVal').innerText = val+'%';
-    }
 
     function toggleRelay(i) {
-      const state = document.getElementById('relay'+i).checked ? 'ON' : 'OFF';
+      let state = document.getElementById('relay'+i).checked ? 'ON':'OFF';
       client.publish('home/relay'+i, state);
+    }
+
+    function slideChange(val) {
+      document.getElementById('percentLabel').innerText = val+'%';
+      client.publish('home/curtain', val.toString());
     }
   </script>
 </body>
