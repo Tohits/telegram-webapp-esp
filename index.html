@@ -1,123 +1,81 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Home Control</title>
+  <title>Smart Home MQTT</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    body { font-family: sans-serif; background: #e0f7fa; padding: 10px; }
-    .card { background: #fff; padding: 20px; margin: 10px auto; border-radius: 10px; max-width: 500px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-    .slider:before { position: absolute; content: ''; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-    input:checked + .slider { background-color: #2196F3; }
-    input:checked + .slider:before { transform: translateX(26px); }
-    input[type=range] { -webkit-appearance: none; width: 90%; height: 45px; background: #ddd; border-radius: 20px; outline: none; margin: 10px auto; display: block; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 45px; height: 45px; background: #2196F3; border-radius: 50%; cursor: pointer; box-shadow: 0 0 4px rgba(0,0,0,0.4); }
-    input[type=range]::-moz-range-thumb { width: 45px; height: 45px; background: #2196F3; border: none; border-radius: 50%; cursor: pointer; }
-    .relay-container { display: flex; flex-direction: column; gap: 15px; }
-    .relay-row { display: flex; align-items: center; justify-content: space-between; }
-    .relay-label { flex: 1; font-size: 16px; }
-    #mqttStatus { font-weight: bold; }
+    body { font-family:sans-serif; padding:10px; background:#e0f7fa; }
+    .card { background:#fff; padding:20px; margin:10px auto; border-radius:10px; max-width:500px; box-shadow:0 4px 8px rgba(0,0,0,0.1); }
+    .relay-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>MQTT Status: <span id="mqttStatus">Connecting...</span></h2>
-  </div>
 
-  <div class="card">
-    <h2>Status</h2>
-    <p id="level">--</p>
-    <p id="rain">--</p>
-    <p>Pulse: <span id="pulse">--</span></p>
-  </div>
+<div class="card">
+  <h2>MQTT Status: <span id="mqttStatus">Disconnected</span></h2>
+  <h3>Status</h3>
+  <p>Water Level: <span id="level">--</span>%</p>
+  <p>Rain: <span id="rain">--</span></p>
+  <p>Curtain: <span id="curtain">--</span>%</p>
+</div>
 
-  <div class="card">
-    <h2>Curtains Control</h2>
-    <input type="range" min="0" max="100" value="0" id="curtainSlider"/>
-    <p style="text-align:center">Selected: <span id="percentLabel">0%</span></p>
-  </div>
+<div class="card">
+  <h3>Curtain Control</h3>
+  <input type="range" min="0" max="100" value="0" id="curtainSlider">
+</div>
 
-  <div class="card">
-    <h2>Electricity Control</h2>
-    <div class="relay-container">
-      <div class="relay-row"><span class="relay-label">Inverter Light 1:</span><label class="switch"><input type="checkbox" id="relay1"><span class="slider"></span></label></div>
-      <div class="relay-row"><span class="relay-label">Inverter Light 2:</span><label class="switch"><input type="checkbox" id="relay2"><span class="slider"></span></label></div>
-      <div class="relay-row"><span class="relay-label">Main Light 1:</span><label class="switch"><input type="checkbox" id="relay3"><span class="slider"></span></label></div>
-      <div class="relay-row"><span class="relay-label">Main Light 2:</span><label class="switch"><input type="checkbox" id="relay4"><span class="slider"></span></label></div>
-    </div>
+<div class="card">
+  <h3>Relays</h3>
+  <div class="relay-row">
+    <label>Relay 1</label><input type="checkbox" id="relay1">
   </div>
-
-  <div class="card">
-    <h2>Device IP</h2>
-    <p id="deviceIP">--</p>
+  <div class="relay-row">
+    <label>Relay 2</label><input type="checkbox" id="relay2">
   </div>
+  <div class="relay-row">
+    <label>Relay 3</label><input type="checkbox" id="relay3">
+  </div>
+  <div class="relay-row">
+    <label>Relay 4</label><input type="checkbox" id="relay4">
+  </div>
+</div>
 
 <script>
-  // MQTT Config
-  const options = {
-    clientId: "web_" + Math.random().toString(16).substr(2, 8),
-    username: "tohits",
-    password: "toh123@TOH",
-    keepalive: 60,
-    clean: true,
-    reconnectPeriod: 5000
-  };
-  const client = mqtt.connect("wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt", options);
+const options = { 
+  connectTimeout: 4000,
+  clientId: "webClient_" + Math.random().toString(16).substr(2, 8),
+  username: "", // if HiveMQ requires
+  password: ""  // if HiveMQ requires
+};
+const client = mqtt.connect('wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8883/mqtt', options);
 
-  client.on("connect", () => {
-    console.log("MQTT Connected");
-    document.getElementById("mqttStatus").innerText = "Connected";
-    document.getElementById("mqttStatus").style.color = "green";
-    client.subscribe("home/relay/+");  // wildcard subscription for all relays
-    client.subscribe("home/curtain");
-    client.subscribe("home/sensors");
-  });
+client.on('connect', function() {
+  document.getElementById('mqttStatus').innerText = 'Connected';
+  client.subscribe('home/sensors');
+});
 
-  client.on("reconnect", () => {
-    document.getElementById("mqttStatus").innerText = "Reconnecting...";
-    document.getElementById("mqttStatus").style.color = "orange";
-  });
-
-  client.on("error", (err) => {
-    console.log("MQTT Error:", err);
-    document.getElementById("mqttStatus").innerText = "Error";
-    document.getElementById("mqttStatus").style.color = "red";
-  });
-
-  client.on("message", (topic, message) => {
-    let msg = message.toString();
-    if(topic.startsWith("home/relay/")) {
-      let idx = parseInt(topic.split("/")[2]);
-      document.getElementById("relay" + idx).checked = (msg === "ON");
-    }
-    if(topic === "home/curtain") {
-      let val = parseInt(msg);
-      document.getElementById("curtainSlider").value = val;
-      document.getElementById("percentLabel").innerText = val + "%";
-    }
-    if(topic === "home/sensors") {
-      let [level, rain, pulse] = msg.split("|");
-      document.getElementById("level").innerText = level.trim();
-      document.getElementById("rain").innerText = rain.trim();
-      document.getElementById("pulse").innerText = pulse.trim();
-    }
-  });
-
-  // Publish relay changes
-  for(let i=1;i<=4;i++){
-    document.getElementById("relay"+i).addEventListener("change", (e)=>{
-      client.publish("home/relay/"+i, e.target.checked ? "ON" : "OFF");
-    });
+client.on('message', function(topic, message) {
+  if(topic=='home/sensors'){
+    const data = message.toString().split('|');
+    document.getElementById('level').innerText = data[0];
+    document.getElementById('rain').innerText = data[1];
+    document.getElementById('curtain').innerText = data[2];
+    document.getElementById('curtainSlider').value = data[2];
   }
+});
 
-  // Publish curtain changes
-  document.getElementById("curtainSlider").addEventListener("input", (e)=>{
-    document.getElementById("percentLabel").innerText = e.target.value + "%";
-    client.publish("home/curtain", e.target.value);
+document.getElementById('curtainSlider').addEventListener('input', function() {
+  client.publish('home/curtain', this.value);
+});
+
+for(let i=1;i<=4;i++){
+  document.getElementById('relay'+i).addEventListener('change', function(){
+    const val = this.checked ? "ON":"OFF";
+    client.publish('home/relay/'+i, val);
   });
+}
 </script>
+
 </body>
 </html>
