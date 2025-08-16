@@ -1,59 +1,83 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>ESP Motor Control via MQTT</title>
-  <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
+  <meta charset="UTF-8">
+  <title>ESP Motor Control</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin-top: 40px; }
-    h1 { color: #333; }
-    .slider { width: 80%; margin: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f3f3;
+      text-align: center;
+      padding: 40px;
+    }
+    h2 {
+      color: #333;
+    }
+    button {
+      padding: 15px 30px;
+      margin: 10px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .forward { background: #4CAF50; color: white; }
+    .backward { background: #2196F3; color: white; }
+    .stop { background: #f44336; color: white; }
+    button:hover { opacity: 0.8; }
+
+    #status {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .connected { color: green; }
+    .disconnected { color: red; }
+    .reconnecting { color: orange; }
   </style>
 </head>
 <body>
-  <h1>Motor Control</h1>
-
-  <input type="range" min="0" max="100" value="0" class="slider" id="motorSlider" oninput="updateMotor(this.value)">
-  <p>Motor Position: <span id="motorValue">0</span>%</p>
+  <h2>ESP Motor Control (via MQTT)</h2>
+  <button class="forward" onclick="sendCommand('forward')">Forward</button>
+  <button class="backward" onclick="sendCommand('backward')">Backward</button>
+  <button class="stop" onclick="sendCommand('stop')">Stop</button>
+  
+  <div id="status" class="disconnected">🔴 Disconnected from MQTT broker</div>
 
   <script>
-    // ==== MQTT CONFIG ====
-    const broker = "93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud";  // Replace with your broker
-    const port = 8883;                   // WebSocket port (usually 8000/8083)
-    const topicMotor = "esp/motor";
+    // MQTT broker settings
+    const broker = "wss://broker.hivemq.com:8083/mqtt";
+    const topic = "esp/motor";
 
-    // ==== MQTT Client ====
-    const clientID = "webClient-" + Math.floor(Math.random() * 10000);
-    const client = new Paho.MQTT.Client(broker, port, clientID);
+    // Connect to broker
+    const client = mqtt.connect(broker);
 
-    client.onConnectionLost = function(response) {
-      console.log("Connection lost: " + response.errorMessage);
-    };
-    client.onMessageArrived = function(message) {
-      console.log("Received: " + message.destinationName + " → " + message.payloadString);
-    };
-
-    client.connect({
-      onSuccess: function() {
-        console.log("Connected to MQTT broker");
-        client.subscribe(topicMotor);
-      },
-      onFailure: function(e) {
-        console.log("Failed to connect: " + e.errorMessage);
-      }
+    client.on("connect", () => {
+      document.getElementById("status").innerHTML = "🟢 Connected to MQTT broker";
+      document.getElementById("status").className = "connected";
+      console.log("Connected");
     });
 
-    // ==== FUNCTIONS ====
-    function sendMessage(topic, msg) {
-      const message = new Paho.MQTT.Message(msg);
-      message.destinationName = topic;
-      client.send(message);
-      console.log("Sent: " + topic + " → " + msg);
-    }
+    client.on("reconnect", () => {
+      document.getElementById("status").innerHTML = "⏳ Reconnecting...";
+      document.getElementById("status").className = "reconnecting";
+    });
 
-    function updateMotor(val) {
-      document.getElementById("motorValue").innerText = val;
-      sendMessage(topicMotor, val);
+    client.on("close", () => {
+      document.getElementById("status").innerHTML = "🔴 Disconnected from MQTT broker";
+      document.getElementById("status").className = "disconnected";
+    });
+
+    client.on("error", (err) => {
+      console.error("Connection error: ", err);
+    });
+
+    function sendCommand(cmd) {
+      client.publish(topic, cmd);
+      console.log("Sent:", cmd);
+      document.getElementById("status").innerText = "📤 Sent: " + cmd + " (still connected)";
     }
   </script>
 </body>
