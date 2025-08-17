@@ -3,28 +3,81 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Motor + Sensors + Relay Control</title>
+<title>Curtain + Sensors + Relay Control</title>
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <style>
-  body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-  h1 { text-align: center; }
-  .section { margin-bottom: 30px; }
-  label { display: block; margin: 10px 0 5px; }
-  button { margin-top: 10px; }
-  .relay-btn { width: 60px; height: 30px; margin-right: 10px; }
-  #motorPercent, #rainStatus, #waterLevel { font-weight: bold; }
+  body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; background: #f7f9fc; color: #333; }
+  h1 { text-align: center; color: #2c3e50; }
+  .section { margin-bottom: 30px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  label { display: block; margin: 10px 0 5px; font-weight: 600; }
+  button, input[type="range"] { cursor: pointer; }
+  #motorPercent, #rainStatus, #waterLevel, #connectionStatus { font-weight: bold; color: #34495e; }
+  #connectionStatus { text-align: center; margin-bottom: 20px; font-size: 1.1em; }
+  
+  /* Toggle Switch */
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 28px;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  .toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    background-color: #ccc;
+    border-radius: 34px;
+    top: 0; left: 0; right: 0; bottom: 0;
+    transition: .4s;
+  }
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: .4s;
+  }
+  input:checked + .slider {
+    background-color: #4CAF50;
+  }
+  input:checked + .slider:before {
+    transform: translateX(32px);
+  }
+
+  /* Relay container */
+  .relay-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .relay-label {
+    flex-grow: 1;
+    font-weight: 600;
+    color: #2c3e50;
+  }
 </style>
 </head>
 <body>
 
-<h1>Motor + Sensors + Relay Control</h1>
+<h1>Curtain + Sensors + Relay Control</h1>
+<div id="connectionStatus">MQTT Status: <span id="mqttStatus">Connecting...</span></div>
 
 <div class="section" id="motorControl">
-  <h2>Motor Control</h2>
+  <h2>Curtain Control</h2>
   <label for="targetPercent">Target Position (%): <span id="targetPercentValue">0</span>%</label>
   <input type="range" id="targetPercent" min="0" max="100" value="0" />
   <p>Current Position: <span id="motorPercent">0</span>%</p>
-  <p>Motor State: <span id="motorState">stopped</span></p>
+  <p>Curtain State: <span id="motorState">stopped</span></p>
 </div>
 
 <div class="section" id="sensorStatus">
@@ -35,11 +88,33 @@
 
 <div class="section" id="relayControl">
   <h2>Relay Control (4 Channels)</h2>
-  <div>
-    <button class="relay-btn" data-ch="1" data-state="off">Relay 1 OFF</button>
-    <button class="relay-btn" data-ch="2" data-state="off">Relay 2 OFF</button>
-    <button class="relay-btn" data-ch="3" data-state="off">Relay 3 OFF</button>
-    <button class="relay-btn" data-ch="4" data-state="off">Relay 4 OFF</button>
+  <div class="relay-row">
+    <label class="relay-label" for="relay1">Inverter Light 1</label>
+    <label class="toggle-switch">
+      <input type="checkbox" id="relay1" data-ch="1" />
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="relay-row">
+    <label class="relay-label" for="relay2">Inverter Light 2</label>
+    <label class="toggle-switch">
+      <input type="checkbox" id="relay2" data-ch="2" />
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="relay-row">
+    <label class="relay-label" for="relay3">Main Light 1</label>
+    <label class="toggle-switch">
+      <input type="checkbox" id="relay3" data-ch="3" />
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="relay-row">
+    <label class="relay-label" for="relay4">Main Light 2</label>
+    <label class="toggle-switch">
+      <input type="checkbox" id="relay4" data-ch="4" />
+      <span class="slider"></span>
+    </label>
   </div>
 </div>
 
@@ -65,10 +140,29 @@
   // Connect MQTT client
   const client = mqtt.connect(broker, options);
 
+  const mqttStatusSpan = document.getElementById('mqttStatus');
+
   client.on('connect', () => {
-    console.log('Connected to MQTT broker');
+    mqttStatusSpan.textContent = 'Connected';
+    mqttStatusSpan.style.color = '#4CAF50';
     // Subscribe to status topics
     client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel]);
+  });
+
+  client.on('reconnect', () => {
+    mqttStatusSpan.textContent = 'Reconnecting...';
+    mqttStatusSpan.style.color = '#FFA500';
+  });
+
+  client.on('close', () => {
+    mqttStatusSpan.textContent = 'Disconnected';
+    mqttStatusSpan.style.color = 'red';
+  });
+
+  client.on('error', (err) => {
+    mqttStatusSpan.textContent = 'Error';
+    mqttStatusSpan.style.color = 'red';
+    console.error('MQTT Error:', err);
   });
 
   client.on('message', (topic, message) => {
@@ -84,7 +178,7 @@
     }
   });
 
-  // Motor control slider
+  // Curtain control slider
   const targetPercentSlider = document.getElementById('targetPercent');
   const targetPercentValue = document.getElementById('targetPercentValue');
 
@@ -97,21 +191,14 @@
     client.publish(topicTarget, val.toString());
   });
 
-  // Relay buttons control
-  const relayButtons = document.querySelectorAll('.relay-btn');
-  relayButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const ch = btn.getAttribute('data-ch');
-      const currentState = btn.getAttribute('data-state') === 'on';
-      const newState = !currentState;
-
-      // Update button appearance
-      btn.setAttribute('data-state', newState ? 'on' : 'off');
-      btn.textContent = `Relay ${ch} ${newState ? 'ON' : 'OFF'}`;
-      btn.style.backgroundColor = newState ? '#4CAF50' : '';
-
+  // Relay toggle switches
+  const relays = [1, 2, 3, 4];
+  relays.forEach(ch => {
+    const checkbox = document.getElementById(`relay${ch}`);
+    checkbox.addEventListener('change', () => {
+      const newState = checkbox.checked;
       // Send JSON command via MQTT
-      const command = JSON.stringify({ ch: parseInt(ch), on: newState });
+      const command = JSON.stringify({ ch: ch, on: newState });
       client.publish(topicRelay, command);
     });
   });
