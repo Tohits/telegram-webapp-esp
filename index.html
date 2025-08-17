@@ -25,7 +25,8 @@
       Broker: <span id="conn">Connecting…</span><br/>
       State: <span id="state">—</span><br/>
       Live position: <span id="live">—</span>%<br/>
-      Rain sensor: <span id="rain">—</span>
+      Rain sensor: <span id="rain">—</span><br/>
+      Water Level: <span id="waterLevel">—</span>%
     </div>
   </div>
 
@@ -42,16 +43,17 @@
     };
 
     // MQTT Topics
-    const TOPIC_TARGET  = "motor/targetPercent";
-    const TOPIC_PERCENT = "motor/percent";
-    const TOPIC_STATE   = "motor/state";
-    const TOPIC_RAIN    = "sensor/rain";
+    const TOPIC_TARGET     = "motor/targetPercent";
+    const TOPIC_PERCENT    = "motor/percent";
+    const TOPIC_STATE      = "motor/state";
+    const TOPIC_RAIN       = "sensor/rain";
+    const TOPIC_WATERLEVEL = "sensor/waterLevel";  // added water level topic
 
     const client = mqtt.connect(url, options);
 
     client.on("connect", () => {
       document.getElementById("conn").innerText = "Connected";
-      client.subscribe([TOPIC_PERCENT, TOPIC_STATE, TOPIC_RAIN]);
+      client.subscribe([TOPIC_PERCENT, TOPIC_STATE, TOPIC_RAIN, TOPIC_WATERLEVEL]);
     });
 
     client.on("reconnect", () => {
@@ -71,6 +73,8 @@
         document.getElementById("state").innerText = msg;
       } else if (topic === TOPIC_RAIN) {
         document.getElementById("rain").innerText = msg === "1" ? "Raining" : "Clear";
+      } else if (topic === TOPIC_WATERLEVEL) {
+        document.getElementById("waterLevel").innerText = msg;
       }
     });
 
