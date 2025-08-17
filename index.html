@@ -1,60 +1,121 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Relay Control</title>
-  <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Motor + Sensors + Relay Control</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+  h1 { text-align: center; }
+  .section { margin-bottom: 30px; }
+  label { display: block; margin: 10px 0 5px; }
+  button { margin-top: 10px; }
+  .relay-btn { width: 60px; height: 30px; margin-right: 10px; }
+  #motorPercent, #rainStatus, #waterLevel { font-weight: bold; }
+</style>
 </head>
 <body>
-  <h2>4-Channel Relay Control</h2>
-  <button onclick="sendRelayCommand(1, true)">Relay 1 ON</button>
-  <button onclick="sendRelayCommand(1, false)">Relay 1 OFF</button><br>
-  <button onclick="sendRelayCommand(2, true)">Relay 2 ON</button>
-  <button onclick="sendRelayCommand(2, false)">Relay 2 OFF</button><br>
-  <button onclick="sendRelayCommand(3, true)">Relay 3 ON</button>
-  <button onclick="sendRelayCommand(3, false)">Relay 3 OFF</button><br>
-  <button onclick="sendRelayCommand(4, true)">Relay 4 ON</button>
-  <button onclick="sendRelayCommand(4, false)">Relay 4 OFF</button>
 
-  <script>
-    // Update these as needed
-    const MQTT_BROKER = "93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud";
-    const MQTT_PORT = 8000; // websocket port
-    const MQTT_USER = "tohits";
-    const MQTT_PASSWORD = "toh123@TOH";
-    const MQTT_TOPIC_RELAY = "relay/control";
+<h1>Motor + Sensors + Relay Control</h1>
 
-    const clientID = "webclient_" + Math.floor(Math.random() * 1000);
-    const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientID);
+<div class="section" id="motorControl">
+  <h2>Motor Control</h2>
+  <label for="targetPercent">Target Position (%): <span id="targetPercentValue">0</span>%</label>
+  <input type="range" id="targetPercent" min="0" max="100" value="0" />
+  <p>Current Position: <span id="motorPercent">0</span>%</p>
+  <p>Motor State: <span id="motorState">stopped</span></p>
+</div>
 
-    client.onConnectionLost = function(responseObject) {
-      console.log("Connection lost: " + responseObject.errorMessage);
-    };
+<div class="section" id="sensorStatus">
+  <h2>Sensor Status</h2>
+  <p>Rain Sensor: <span id="rainStatus">No Rain</span></p>
+  <p>Water Level: <span id="waterLevel">0</span>%</p>
+</div>
 
-    client.onMessageArrived = function(message) {
-      console.log("Message arrived: " + message.payloadString);
-    };
+<div class="section" id="relayControl">
+  <h2>Relay Control (4 Channels)</h2>
+  <div>
+    <button class="relay-btn" data-ch="1" data-state="off">Relay 1 OFF</button>
+    <button class="relay-btn" data-ch="2" data-state="off">Relay 2 OFF</button>
+    <button class="relay-btn" data-ch="3" data-state="off">Relay 3 OFF</button>
+    <button class="relay-btn" data-ch="4" data-state="off">Relay 4 OFF</button>
+  </div>
+</div>
 
-    function onConnect() {
-      console.log("Connected to MQTT broker");
-      // You can subscribe here if needed
+<script>
+  // MQTT broker connection info
+  const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt'; // WebSocket + TLS
+  const options = {
+    username: 'tohits',
+    password: 'toh123@TOH',
+    reconnectPeriod: 1000,
+    clean: true,
+    connectTimeout: 4000,
+  };
+
+  // Topics
+  const topicTarget = 'motor/targetPercent';
+  const topicPercent = 'motor/percent';
+  const topicState = 'motor/state';
+  const topicRain = 'sensor/rain';
+  const topicWaterLevel = 'sensor/waterLevel';
+  const topicRelay = 'relay/control';
+
+  // Connect MQTT client
+  const client = mqtt.connect(broker, options);
+
+  client.on('connect', () => {
+    console.log('Connected to MQTT broker');
+    // Subscribe to status topics
+    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel]);
+  });
+
+  client.on('message', (topic, message) => {
+    const msg = message.toString();
+    if (topic === topicPercent) {
+      document.getElementById('motorPercent').textContent = msg;
+    } else if (topic === topicState) {
+      document.getElementById('motorState').textContent = msg;
+    } else if (topic === topicRain) {
+      document.getElementById('rainStatus').textContent = (msg === '1') ? 'Raining' : 'No Rain';
+    } else if (topic === topicWaterLevel) {
+      document.getElementById('waterLevel').textContent = msg;
     }
+  });
 
-    client.connect({
-      userName: MQTT_USER,
-      password: MQTT_PASSWORD,
-      onSuccess: onConnect,
-      useSSL: true,
-      mqttVersion: 4
+  // Motor control slider
+  const targetPercentSlider = document.getElementById('targetPercent');
+  const targetPercentValue = document.getElementById('targetPercentValue');
+
+  targetPercentSlider.addEventListener('input', () => {
+    targetPercentValue.textContent = targetPercentSlider.value;
+  });
+
+  targetPercentSlider.addEventListener('change', () => {
+    const val = parseInt(targetPercentSlider.value);
+    client.publish(topicTarget, val.toString());
+  });
+
+  // Relay buttons control
+  const relayButtons = document.querySelectorAll('.relay-btn');
+  relayButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ch = btn.getAttribute('data-ch');
+      const currentState = btn.getAttribute('data-state') === 'on';
+      const newState = !currentState;
+
+      // Update button appearance
+      btn.setAttribute('data-state', newState ? 'on' : 'off');
+      btn.textContent = `Relay ${ch} ${newState ? 'ON' : 'OFF'}`;
+      btn.style.backgroundColor = newState ? '#4CAF50' : '';
+
+      // Send JSON command via MQTT
+      const command = JSON.stringify({ ch: parseInt(ch), on: newState });
+      client.publish(topicRelay, command);
     });
+  });
+</script>
 
-    function sendRelayCommand(ch, on) {
-      const msgObj = { ch: ch, on: on };
-      const msgStr = JSON.stringify(msgObj);
-      const message = new Paho.MQTT.Message(msgStr);
-      message.destinationName = MQTT_TOPIC_RELAY;
-      client.send(message);
-      console.log("Sent:", msgStr);
-    }
-  </script>
 </body>
 </html>
