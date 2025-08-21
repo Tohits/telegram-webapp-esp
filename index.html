@@ -211,6 +211,7 @@
   const topicRain = 'sensor/rain';
   const topicWaterLevel = 'sensor/waterLevel';
   const topicRelay = 'relay/control';
+  const topicRelayStatus = 'relay/status';  // <-- Added topic for relay state sync
 
   const client = mqtt.connect(broker, options);
   const mqttStatusSpan = document.getElementById('mqttStatus');
@@ -218,7 +219,7 @@
   client.on('connect', () => {
     mqttStatusSpan.textContent = 'Connected';
     mqttStatusSpan.style.color = '#4CAF50';
-    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel]);
+    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel, topicRelayStatus]); // subscribe relay status topic
   });
 
   client.on('reconnect', () => {
@@ -247,6 +248,20 @@
       document.getElementById('rainStatus').textContent = (msg === '1') ? 'Raining' : 'No Rain';
     } else if (topic === topicWaterLevel) {
       document.getElementById('waterLevel').textContent = msg;
+
+    } else if (topic === topicRelayStatus) {
+      // Parse relay status JSON and update checkboxes
+      try {
+        const states = JSON.parse(msg);
+        [1, 2, 3, 4].forEach(ch => {
+          const checkbox = document.getElementById(`relay${ch}`);
+          if (checkbox && states.hasOwnProperty(ch)) {
+            checkbox.checked = !!states[ch];
+          }
+        });
+      } catch (e) {
+        console.error('Invalid relay status JSON:', msg);
+      }
     }
   });
 
