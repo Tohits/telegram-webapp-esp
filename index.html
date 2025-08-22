@@ -6,7 +6,6 @@
   <title>Curtain + Sensors + Relay Control</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
-    /* ... your existing CSS unchanged ... */
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
@@ -237,45 +236,11 @@
     targetPercentSlider.style.background = `linear-gradient(90deg, #4CAF50 ${val}%, #ccc ${val}%)`;
   }
 
-  // Track user drag and debounce MQTT updates after interaction
-  let userIsInteracting = false;
-  let interactionTimeout;
-
-  function startInteraction() {
-    userIsInteracting = true;
-    if (interactionTimeout) {
-      clearTimeout(interactionTimeout);
-      interactionTimeout = null;
-    }
-  }
-
-  function endInteraction() {
-    // Delay ending interaction to allow for quick user interactions
-    interactionTimeout = setTimeout(() => {
-      userIsInteracting = false;
-      interactionTimeout = null;
-    }, 500); // 500ms debounce delay
-  }
-
-  // Use pointer events for broad device support
-  targetPercentSlider.addEventListener('pointerdown', startInteraction);
-  targetPercentSlider.addEventListener('pointerup', endInteraction);
-  targetPercentSlider.addEventListener('pointercancel', endInteraction);
-  targetPercentSlider.addEventListener('pointerleave', endInteraction);
-
   client.on('message', (topic, message) => {
     const msg = message.toString();
     if (topic === topicPercent) {
+      // ONLY update the motor position text, DO NOT update slider value
       document.getElementById('motorPercent').textContent = msg;
-
-      if (!userIsInteracting) {
-        // Only update slider if value differs to avoid unnecessary updates
-        if (targetPercentSlider.value !== msg) {
-          targetPercentSlider.value = msg;
-          targetPercentValue.textContent = msg;
-          updateSliderBackground();
-        }
-      }
     } else if (topic === topicState) {
       document.getElementById('motorState').textContent = msg;
     } else if (topic === topicRain) {
@@ -304,10 +269,7 @@
 
   targetPercentSlider.addEventListener('change', () => {
     const val = parseInt(targetPercentSlider.value);
-    const current = parseInt(document.getElementById('motorPercent').textContent);
-    if (val !== current) {
-      client.publish(topicTarget, val.toString());
-    }
+    client.publish(topicTarget, val.toString());
   });
 
   updateSliderBackground(); // Initial fill
