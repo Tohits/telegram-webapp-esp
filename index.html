@@ -42,16 +42,18 @@
       margin-bottom: 20px;
       font-size: 1.1em;
     }
+
+    /* Stylish range slider */
     input[type=range] {
       -webkit-appearance: none;
-      width: calc(100% - 60px); /* Leave space for number tab */
+      width: 100%;
       height: 10px;
       border-radius: 5px;
       background: linear-gradient(90deg, #4CAF50 0%, #ccc 0%);
       outline: none;
       transition: background 450ms ease-in;
-      vertical-align: middle;
     }
+
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
       height: 24px;
@@ -64,6 +66,7 @@
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
       transition: background 250ms;
     }
+
     input[type=range]::-moz-range-thumb {
       height: 24px;
       width: 24px;
@@ -73,6 +76,7 @@
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
+
     input[type=range]::-ms-thumb {
       height: 24px;
       width: 24px;
@@ -81,27 +85,13 @@
       border: 2px solid white;
       cursor: pointer;
     }
+
     input[type=range]::-webkit-slider-runnable-track {
       height: 10px;
       border-radius: 5px;
     }
-    .slider-value-tab {
-      display: inline-block;
-      width: 50px;
-      height: 30px;
-      margin-left: 10px;
-      background-color: #4CAF50;
-      color: white;
-      font-weight: bold;
-      font-size: 1.1em;
-      line-height: 30px;
-      text-align: center;
-      border-radius: 5px;
-      vertical-align: middle;
-      user-select: none;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    }
-    /* Rest of your styles ... */
+
+    /* Toggle Switch */
     .toggle-switch {
       position: relative;
       display: inline-block;
@@ -140,6 +130,8 @@
     input:checked + .slider:before {
       transform: translateX(32px);
     }
+
+    /* Relay container */
     .relay-row {
       display: flex;
       align-items: center;
@@ -160,10 +152,7 @@
 <div class="section" id="motorControl">
   <h2>Curtain Control</h2>
   <label for="targetPercent">Target Position (%): <span id="targetPercentValue">0</span>%</label>
-  <div style="display: flex; align-items: center;">
-    <input type="range" id="targetPercent" min="0" max="100" value="0" />
-    <div class="slider-value-tab" id="currentPositionTab">0%</div>
-  </div>
+  <input type="range" id="targetPercent" min="0" max="100" value="0" />
   <p>Current Position: <span id="motorPercent">0</span>%</p>
   <p>Curtain State: <span id="motorState">stopped</span></p>
 </div>
@@ -211,7 +200,6 @@
   const options = {
     username: 'tohits',
     password: 'toh123@TOH',
-    clientId: 'webclient_' + Math.random().toString(16).substr(2, 8),
     reconnectPeriod: 1000,
     clean: true,
     connectTimeout: 4000,
@@ -223,73 +211,46 @@
   const topicRain = 'sensor/rain';
   const topicWaterLevel = 'sensor/waterLevel';
   const topicRelay = 'relay/control';
-  const topicRelayStatus = 'relay/status';
+  const topicRelayStatus = 'relay/status';  // <-- Added topic for relay state sync
 
   const client = mqtt.connect(broker, options);
   const mqttStatusSpan = document.getElementById('mqttStatus');
 
   client.on('connect', () => {
-    console.log('Connected to MQTT broker');
     mqttStatusSpan.textContent = 'Connected';
     mqttStatusSpan.style.color = '#4CAF50';
-    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel, topicRelayStatus], (err) => {
-      if (err) {
-        console.error('Subscription error:', err);
-      } else {
-        console.log('Subscribed to topics');
-      }
-    });
+    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel, topicRelayStatus]); // subscribe relay status topic
   });
 
   client.on('reconnect', () => {
-    console.log('Reconnecting to MQTT broker...');
     mqttStatusSpan.textContent = 'Reconnecting...';
     mqttStatusSpan.style.color = '#FFA500';
   });
 
   client.on('close', () => {
-    console.log('Disconnected from MQTT broker');
     mqttStatusSpan.textContent = 'Disconnected';
     mqttStatusSpan.style.color = 'red';
   });
 
   client.on('error', (err) => {
-    console.error('MQTT Error:', err);
     mqttStatusSpan.textContent = 'Error';
     mqttStatusSpan.style.color = 'red';
+    console.error('MQTT Error:', err);
   });
-
-  const targetPercentSlider = document.getElementById('targetPercent');
-  const targetPercentValue = document.getElementById('targetPercentValue');
-  const currentPositionTab = document.getElementById('currentPositionTab');
-
-  function updateSliderBackground() {
-    const val = targetPercentSlider.value;
-    targetPercentSlider.style.background = `linear-gradient(90deg, #4CAF50 ${val}%, #ccc ${val}%)`;
-  }
 
   client.on('message', (topic, message) => {
     const msg = message.toString();
-    console.log('MQTT message received:', topic, msg);
     if (topic === topicPercent) {
       document.getElementById('motorPercent').textContent = msg;
-
-      // Update the current position tab text
-      currentPositionTab.textContent = msg + '%';
-
-      // ✅ Sync slider with real curtain position (only if not dragging)
-      if (!targetPercentSlider.matches(':focus')) {
-        targetPercentSlider.value = msg;
-        targetPercentValue.textContent = msg;
-        updateSliderBackground();
-      }
     } else if (topic === topicState) {
       document.getElementById('motorState').textContent = msg;
     } else if (topic === topicRain) {
       document.getElementById('rainStatus').textContent = (msg === '1') ? 'Raining' : 'No Rain';
     } else if (topic === topicWaterLevel) {
       document.getElementById('waterLevel').textContent = msg;
+
     } else if (topic === topicRelayStatus) {
+      // Parse relay status JSON and update checkboxes
       try {
         const states = JSON.parse(msg);
         [1, 2, 3, 4].forEach(ch => {
@@ -304,6 +265,14 @@
     }
   });
 
+  const targetPercentSlider = document.getElementById('targetPercent');
+  const targetPercentValue = document.getElementById('targetPercentValue');
+
+  function updateSliderBackground() {
+    const val = targetPercentSlider.value;
+    targetPercentSlider.style.background = `linear-gradient(90deg, #4CAF50 ${val}%, #ccc ${val}%)`;
+  }
+
   targetPercentSlider.addEventListener('input', () => {
     targetPercentValue.textContent = targetPercentSlider.value;
     updateSliderBackground();
@@ -311,14 +280,12 @@
 
   targetPercentSlider.addEventListener('change', () => {
     const val = parseInt(targetPercentSlider.value);
-    const current = parseInt(document.getElementById('motorPercent').textContent);
-    if (val !== current) {
-      client.publish(topicTarget, val.toString());
-    }
+    client.publish(topicTarget, val.toString());
   });
 
-  updateSliderBackground(); // Initial fill
+  updateSliderBackground(); // Initial background fill
 
+  // Relay control
   [1, 2, 3, 4].forEach(ch => {
     const checkbox = document.getElementById(`relay${ch}`);
     checkbox.addEventListener('change', () => {
