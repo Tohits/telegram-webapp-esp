@@ -236,15 +236,32 @@
     targetPercentSlider.style.background = `linear-gradient(90deg, #4CAF50 ${val}%, #ccc ${val}%)`;
   }
 
+  // Track user drag to prevent slider jumping from MQTT updates
+  let userIsDragging = false;
+
+  targetPercentSlider.addEventListener('mousedown', () => {
+    userIsDragging = true;
+  });
+  targetPercentSlider.addEventListener('touchstart', () => {
+    userIsDragging = true;
+  });
+  targetPercentSlider.addEventListener('mouseup', () => {
+    userIsDragging = false;
+  });
+  targetPercentSlider.addEventListener('touchend', () => {
+    userIsDragging = false;
+  });
+
   client.on('message', (topic, message) => {
     const msg = message.toString();
     if (topic === topicPercent) {
       document.getElementById('motorPercent').textContent = msg;
 
-      // ✅ Sync slider with real curtain position
-      targetPercentSlider.value = msg;
-      targetPercentValue.textContent = msg;
-      updateSliderBackground();
+      if (!userIsDragging) { // only update slider if user NOT dragging it
+        targetPercentSlider.value = msg;
+        targetPercentValue.textContent = msg;
+        updateSliderBackground();
+      }
     } else if (topic === topicState) {
       document.getElementById('motorState').textContent = msg;
     } else if (topic === topicRain) {
