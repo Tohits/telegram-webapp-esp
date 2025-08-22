@@ -43,6 +43,7 @@
       font-size: 1.1em;
     }
 
+    /* Stylish range slider */
     input[type=range] {
       -webkit-appearance: none;
       width: 100%;
@@ -52,6 +53,7 @@
       outline: none;
       transition: background 450ms ease-in;
     }
+
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
       height: 24px;
@@ -62,7 +64,9 @@
       cursor: pointer;
       margin-top: -7px;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      transition: background 250ms;
     }
+
     input[type=range]::-moz-range-thumb {
       height: 24px;
       width: 24px;
@@ -70,7 +74,9 @@
       background: #4CAF50;
       border: 2px solid white;
       cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
+
     input[type=range]::-ms-thumb {
       height: 24px;
       width: 24px;
@@ -79,11 +85,13 @@
       border: 2px solid white;
       cursor: pointer;
     }
+
     input[type=range]::-webkit-slider-runnable-track {
       height: 10px;
       border-radius: 5px;
     }
 
+    /* Toggle Switch */
     .toggle-switch {
       position: relative;
       display: inline-block;
@@ -123,6 +131,7 @@
       transform: translateX(32px);
     }
 
+    /* Relay container */
     .relay-row {
       display: flex;
       align-items: center;
@@ -202,7 +211,7 @@
   const topicRain = 'sensor/rain';
   const topicWaterLevel = 'sensor/waterLevel';
   const topicRelay = 'relay/control';
-  const topicRelayStatus = 'relay/status';
+  const topicRelayStatus = 'relay/status';  // <-- Added topic for relay state sync
 
   const client = mqtt.connect(broker, options);
   const mqttStatusSpan = document.getElementById('mqttStatus');
@@ -210,8 +219,7 @@
   client.on('connect', () => {
     mqttStatusSpan.textContent = 'Connected';
     mqttStatusSpan.style.color = '#4CAF50';
-    // subscribe to all retained topics
-    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel, topicRelayStatus]);
+    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel, topicRelayStatus]); // subscribe relay status topic
   });
 
   client.on('reconnect', () => {
@@ -240,7 +248,9 @@
       document.getElementById('rainStatus').textContent = (msg === '1') ? 'Raining' : 'No Rain';
     } else if (topic === topicWaterLevel) {
       document.getElementById('waterLevel').textContent = msg;
+
     } else if (topic === topicRelayStatus) {
+      // Parse relay status JSON and update checkboxes
       try {
         const states = JSON.parse(msg);
         [1, 2, 3, 4].forEach(ch => {
@@ -273,8 +283,9 @@
     client.publish(topicTarget, val.toString());
   });
 
-  updateSliderBackground();
+  updateSliderBackground(); // Initial background fill
 
+  // Relay control
   [1, 2, 3, 4].forEach(ch => {
     const checkbox = document.getElementById(`relay${ch}`);
     checkbox.addEventListener('change', () => {
