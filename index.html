@@ -190,6 +190,7 @@
   const options = {
     username: 'tohits',
     password: 'toh123@TOH',
+    clientId: 'webclient_' + Math.random().toString(16).substr(2, 8),
     reconnectPeriod: 1000,
     clean: true,
     connectTimeout: 4000,
@@ -207,25 +208,34 @@
   const mqttStatusSpan = document.getElementById('mqttStatus');
 
   client.on('connect', () => {
+    console.log('Connected to MQTT broker');
     mqttStatusSpan.textContent = 'Connected';
     mqttStatusSpan.style.color = '#4CAF50';
-    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel, topicRelayStatus]);
+    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel, topicRelayStatus], (err) => {
+      if (err) {
+        console.error('Subscription error:', err);
+      } else {
+        console.log('Subscribed to topics');
+      }
+    });
   });
 
   client.on('reconnect', () => {
+    console.log('Reconnecting to MQTT broker...');
     mqttStatusSpan.textContent = 'Reconnecting...';
     mqttStatusSpan.style.color = '#FFA500';
   });
 
   client.on('close', () => {
+    console.log('Disconnected from MQTT broker');
     mqttStatusSpan.textContent = 'Disconnected';
     mqttStatusSpan.style.color = 'red';
   });
 
   client.on('error', (err) => {
+    console.error('MQTT Error:', err);
     mqttStatusSpan.textContent = 'Error';
     mqttStatusSpan.style.color = 'red';
-    console.error('MQTT Error:', err);
   });
 
   const targetPercentSlider = document.getElementById('targetPercent');
@@ -238,9 +248,16 @@
 
   client.on('message', (topic, message) => {
     const msg = message.toString();
+    console.log('MQTT message received:', topic, msg);
     if (topic === topicPercent) {
-      // ONLY update the motor position text, DO NOT update slider value
       document.getElementById('motorPercent').textContent = msg;
+
+      // ✅ Sync slider with real curtain position (only if not dragging)
+      if (!targetPercentSlider.matches(':focus')) {
+        targetPercentSlider.value = msg;
+        targetPercentValue.textContent = msg;
+        updateSliderBackground();
+      }
     } else if (topic === topicState) {
       document.getElementById('motorState').textContent = msg;
     } else if (topic === topicRain) {
@@ -269,7 +286,10 @@
 
   targetPercentSlider.addEventListener('change', () => {
     const val = parseInt(targetPercentSlider.value);
-    client.publish(topicTarget, val.toString());
+    const current = parseInt(document.getElementById('motorPercent').textContent);
+    if (val !== current) {
+      client.publish(topicTarget, val.toString());
+    }
   });
 
   updateSliderBackground(); // Initial fill
