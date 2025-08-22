@@ -6,6 +6,7 @@
   <title>Curtain + Sensors + Relay Control</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
+    /* ... your existing CSS unchanged ... */
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
@@ -236,31 +237,44 @@
     targetPercentSlider.style.background = `linear-gradient(90deg, #4CAF50 ${val}%, #ccc ${val}%)`;
   }
 
-  // Track user drag to prevent slider jumping from MQTT updates
-  let userIsDragging = false;
+  // Track user drag and debounce MQTT updates after interaction
+  let userIsInteracting = false;
+  let interactionTimeout;
 
-  targetPercentSlider.addEventListener('mousedown', () => {
-    userIsDragging = true;
-  });
-  targetPercentSlider.addEventListener('touchstart', () => {
-    userIsDragging = true;
-  });
-  targetPercentSlider.addEventListener('mouseup', () => {
-    userIsDragging = false;
-  });
-  targetPercentSlider.addEventListener('touchend', () => {
-    userIsDragging = false;
-  });
+  function startInteraction() {
+    userIsInteracting = true;
+    if (interactionTimeout) {
+      clearTimeout(interactionTimeout);
+      interactionTimeout = null;
+    }
+  }
+
+  function endInteraction() {
+    // Delay ending interaction to allow for quick user interactions
+    interactionTimeout = setTimeout(() => {
+      userIsInteracting = false;
+      interactionTimeout = null;
+    }, 500); // 500ms debounce delay
+  }
+
+  // Use pointer events for broad device support
+  targetPercentSlider.addEventListener('pointerdown', startInteraction);
+  targetPercentSlider.addEventListener('pointerup', endInteraction);
+  targetPercentSlider.addEventListener('pointercancel', endInteraction);
+  targetPercentSlider.addEventListener('pointerleave', endInteraction);
 
   client.on('message', (topic, message) => {
     const msg = message.toString();
     if (topic === topicPercent) {
       document.getElementById('motorPercent').textContent = msg;
 
-      if (!userIsDragging) { // only update slider if user NOT dragging it
-        targetPercentSlider.value = msg;
-        targetPercentValue.textContent = msg;
-        updateSliderBackground();
+      if (!userIsInteracting) {
+        // Only update slider if value differs to avoid unnecessary updates
+        if (targetPercentSlider.value !== msg) {
+          targetPercentSlider.value = msg;
+          targetPercentValue.textContent = msg;
+          updateSliderBackground();
+        }
       }
     } else if (topic === topicState) {
       document.getElementById('motorState').textContent = msg;
