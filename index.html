@@ -1,300 +1,42 @@
+const char* htmlPage = R"rawliteral(
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Curtain + Sensors + Relay Control</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      max-width: 600px;
-      margin: auto;
-      background: #f7f9fc;
-      color: #333;
-    }
-    h1 {
-      text-align: center;
-      color: #2c3e50;
-    }
-    .section {
-      margin-bottom: 30px;
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-    label {
-      display: block;
-      margin: 10px 0 5px;
-      font-weight: 600;
-    }
-    button, input[type="range"] {
-      cursor: pointer;
-    }
-    #motorPercent, #rainStatus, #waterLevel, #connectionStatus {
-      font-weight: bold;
-      color: #34495e;
-    }
-    #connectionStatus {
-      text-align: center;
-      margin-bottom: 20px;
-      font-size: 1.1em;
-    }
+<title>Motor Control</title>
+<style>
+body {font-family:Arial;text-align:center;}
+h2 {color:#333;}
+button {
+  width:150px;height:60px;font-size:20px;margin:15px;
+  border:none;border-radius:12px;color:white;cursor:pointer;
+  box-shadow: 0 5px #666;transition:0.2s;
+}
+button:active {box-shadow: 0 2px #666; transform: translateY(4px);}
+#onBtn {background:gray;}
+#offBtn {background:gray;}
+</style>
+<script>
+// AJAX send command
+function sendCommand(cmd){fetch('/'+cmd);}
 
-    /* Stylish range slider */
-    input[type=range] {
-      -webkit-appearance: none;
-      width: 100%;
-      height: 10px;
-      border-radius: 5px;
-      background: linear-gradient(90deg, #4CAF50 0%, #ccc 0%);
-      outline: none;
-      transition: background 450ms ease-in;
-    }
-
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      height: 24px;
-      width: 24px;
-      border-radius: 50%;
-      background: #4CAF50;
-      border: 2px solid white;
-      cursor: pointer;
-      margin-top: -7px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-      transition: background 250ms;
-    }
-
-    input[type=range]::-moz-range-thumb {
-      height: 24px;
-      width: 24px;
-      border-radius: 50%;
-      background: #4CAF50;
-      border: 2px solid white;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    }
-
-    input[type=range]::-ms-thumb {
-      height: 24px;
-      width: 24px;
-      border-radius: 50%;
-      background: #4CAF50;
-      border: 2px solid white;
-      cursor: pointer;
-    }
-
-    input[type=range]::-webkit-slider-runnable-track {
-      height: 10px;
-      border-radius: 5px;
-    }
-
-    /* Toggle Switch */
-    .toggle-switch {
-      position: relative;
-      display: inline-block;
-      width: 60px;
-      height: 28px;
-      margin-right: 10px;
-      vertical-align: middle;
-    }
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      background-color: #ccc;
-      border-radius: 34px;
-      top: 0; left: 0; right: 0; bottom: 0;
-      transition: .4s;
-    }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 22px;
-      width: 22px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      border-radius: 50%;
-      transition: .4s;
-    }
-    input:checked + .slider {
-      background-color: #4CAF50;
-    }
-    input:checked + .slider:before {
-      transform: translateX(32px);
-    }
-
-    /* Relay container */
-    .relay-row {
-      display: flex;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .relay-label {
-      flex-grow: 1;
-      font-weight: 600;
-      color: #2c3e50;
-    }
-  </style>
+// Poll motor status every 500ms
+function updateStatus(){
+  fetch('/status').then(r=>r.text()).then(d=>{
+    document.getElementById('status').innerHTML=d;
+    if(d=='ON'){document.getElementById('onBtn').style.background='limegreen';
+                 document.getElementById('offBtn').style.background='gray';}
+    else{document.getElementById('offBtn').style.background='tomato';
+         document.getElementById('onBtn').style.background='gray';}
+  });
+}
+setInterval(updateStatus,500);
+</script>
 </head>
 <body>
-
-<h1>Curtain + Sensors + Relay Control</h1>
-<div id="connectionStatus">MQTT Status: <span id="mqttStatus">Connecting...</span></div>
-
-<div class="section" id="motorControl">
-  <h2>Curtain Control</h2>
-  <label for="targetPercent">Target Position (%): <span id="targetPercentValue">0</span>%</label>
-  <input type="range" id="targetPercent" min="0" max="100" value="0" />
-  <p>Current Position: <span id="motorPercent">0</span>%</p>
-  <p>Curtain State: <span id="motorState">stopped</span></p>
-</div>
-
-<div class="section" id="sensorStatus">
-  <h2>Sensor Status</h2>
-  <p>Rain Sensor: <span id="rainStatus">No Rain</span></p>
-  <p>Water Level: <span id="waterLevel">0</span>%</p>
-</div>
-
-<div class="section" id="relayControl">
-  <h2>Relay Control (4 Channels)</h2>
-  <div class="relay-row">
-    <label class="relay-label" for="relay1">Inverter Light 1</label>
-    <label class="toggle-switch">
-      <input type="checkbox" id="relay1" data-ch="1" />
-      <span class="slider"></span>
-    </label>
-  </div>
-  <div class="relay-row">
-    <label class="relay-label" for="relay2">Inverter Light 2</label>
-    <label class="toggle-switch">
-      <input type="checkbox" id="relay2" data-ch="2" />
-      <span class="slider"></span>
-    </label>
-  </div>
-  <div class="relay-row">
-    <label class="relay-label" for="relay3">Main Light 1</label>
-    <label class="toggle-switch">
-      <input type="checkbox" id="relay3" data-ch="3" />
-      <span class="slider"></span>
-    </label>
-  </div>
-  <div class="relay-row">
-    <label class="relay-label" for="relay4">Main Light 2</label>
-    <label class="toggle-switch">
-      <input type="checkbox" id="relay4" data-ch="4" />
-      <span class="slider"></span>
-    </label>
-  </div>
-</div>
-
-<script>
-  const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
-  const options = {
-    username: 'tohits',
-    password: 'toh123@TOH',
-    reconnectPeriod: 1000,
-    clean: true,
-    connectTimeout: 4000,
-  };
-
-  const topicTarget = 'motor/targetPercent';
-  const topicPercent = 'motor/percent';
-  const topicState = 'motor/state';
-  const topicRain = 'sensor/rain';
-  const topicWaterLevel = 'sensor/waterLevel';
-  const topicRelay = 'relay/control';
-  const topicRelayStatus = 'relay/status';  // <-- Added topic for relay state sync
-
-  const client = mqtt.connect(broker, options);
-  const mqttStatusSpan = document.getElementById('mqttStatus');
-
-  client.on('connect', () => {
-    mqttStatusSpan.textContent = 'Connected';
-    mqttStatusSpan.style.color = '#4CAF50';
-    client.subscribe([topicPercent, topicState, topicRain, topicWaterLevel, topicRelayStatus]); // subscribe relay status topic
-  });
-
-  client.on('reconnect', () => {
-    mqttStatusSpan.textContent = 'Reconnecting...';
-    mqttStatusSpan.style.color = '#FFA500';
-  });
-
-  client.on('close', () => {
-    mqttStatusSpan.textContent = 'Disconnected';
-    mqttStatusSpan.style.color = 'red';
-  });
-
-  client.on('error', (err) => {
-    mqttStatusSpan.textContent = 'Error';
-    mqttStatusSpan.style.color = 'red';
-    console.error('MQTT Error:', err);
-  });
-
-  client.on('message', (topic, message) => {
-    const msg = message.toString();
-    if (topic === topicPercent) {
-      document.getElementById('motorPercent').textContent = msg;
-    } else if (topic === topicState) {
-      document.getElementById('motorState').textContent = msg;
-    } else if (topic === topicRain) {
-      document.getElementById('rainStatus').textContent = (msg === '1') ? 'Raining' : 'No Rain';
-    } else if (topic === topicWaterLevel) {
-      document.getElementById('waterLevel').textContent = msg;
-
-    } else if (topic === topicRelayStatus) {
-      // Parse relay status JSON and update checkboxes
-      try {
-        const states = JSON.parse(msg);
-        [1, 2, 3, 4].forEach(ch => {
-          const checkbox = document.getElementById(`relay${ch}`);
-          if (checkbox && states.hasOwnProperty(ch)) {
-            checkbox.checked = !!states[ch];
-          }
-        });
-      } catch (e) {
-        console.error('Invalid relay status JSON:', msg);
-      }
-    }
-  });
-
-  const targetPercentSlider = document.getElementById('targetPercent');
-  const targetPercentValue = document.getElementById('targetPercentValue');
-
-  function updateSliderBackground() {
-    const val = targetPercentSlider.value;
-    targetPercentSlider.style.background = `linear-gradient(90deg, #4CAF50 ${val}%, #ccc ${val}%)`;
-  }
-
-  targetPercentSlider.addEventListener('input', () => {
-    targetPercentValue.textContent = targetPercentSlider.value;
-    updateSliderBackground();
-  });
-
-  targetPercentSlider.addEventListener('change', () => {
-    const val = parseInt(targetPercentSlider.value);
-    client.publish(topicTarget, val.toString());
-  });
-
-  updateSliderBackground(); // Initial background fill
-
-  // Relay control
-  [1, 2, 3, 4].forEach(ch => {
-    const checkbox = document.getElementById(`relay${ch}`);
-    checkbox.addEventListener('change', () => {
-      const newState = checkbox.checked;
-      const command = JSON.stringify({ ch: ch, on: newState });
-      client.publish(topicRelay, command);
-    });
-  });
-</script>
-
+<h2>3-Phase Motor Control</h2>
+<p>Status: <b id='status'>OFF</b></p>
+<button id='onBtn' onclick="sendCommand('on')">ON</button>
+<button id='offBtn' onclick="sendCommand('off')">OFF</button>
 </body>
 </html>
+)rawliteral";
