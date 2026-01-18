@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>3-Phase Motor Control</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>3-Phase Motor Control with MQTT</title>
 <style>
-body {
+  body {
     font-family: Arial, sans-serif;
     text-align: center;
     background: #f4f4f9;
     color: #333;
-}
-h2 {
+  }
+  h2 {
     margin-top: 30px;
-}
-p {
+  }
+  p {
     font-size: 22px;
-}
-button {
+  }
+  button {
     width: 160px;
     height: 70px;
     font-size: 22px;
@@ -28,66 +28,121 @@ button {
     cursor: pointer;
     box-shadow: 0 5px #666;
     transition: 0.2s;
-}
-button:active {
+  }
+  button:active {
     box-shadow: 0 2px #666;
     transform: translateY(4px);
-}
-#onBtn { background: gray; }
-#offBtn { background: gray; }
+  }
+  #onBtn { background: gray; }
+  #offBtn { background: gray; }
 
-#mqttStatus {
+  #mqttStatus {
     font-weight: bold;
     font-size: 20px;
-}
+  }
 </style>
-<script>
-// ===== Replace this with your NodeMCU IP =====
-const ESP_IP = "192.168.1.123"; 
-
-function sendCommand(cmd) {
-    fetch(`http://${ESP_IP}/${cmd}`);
-}
-
-function updateStatus() {
-    // Motor status
-    fetch(`http://${ESP_IP}/status`)
-        .then(r=>r.text())
-        .then(d=>{
-            document.getElementById('status').innerText = d;
-            if(d === 'ON'){
-                document.getElementById('onBtn').style.background='limegreen';
-                document.getElementById('offBtn').style.background='gray';
-            } else {
-                document.getElementById('offBtn').style.background='tomato';
-                document.getElementById('onBtn').style.background='gray';
-            }
-        });
-
-    // MQTT status
-    fetch(`http://${ESP_IP}/mqttstatus`)
-        .then(r=>r.text())
-        .then(d=>{
-            document.getElementById('mqttStatus').innerText = d;
-            if(d === 'Connected') document.getElementById('mqttStatus').style.color='limegreen';
-            else document.getElementById('mqttStatus').style.color='red';
-        });
-}
-
-// Poll every 500ms
-setInterval(updateStatus, 500);
-window.onload = updateStatus;
-</script>
 </head>
 <body>
 
 <h2>3-Phase Motor Control</h2>
 
-<p>Motor Status: <b id="status">OFF</b></p>
-<button id="onBtn" onclick="sendCommand('on')">ON</button>
-<button id="offBtn" onclick="sendCommand('off')">OFF</button>
+<p>Motor Status: <b id="motorStatus">OFF</b></p>
+<button id="onBtn" onclick="sendCommand('ON')">ON</button>
+<button id="offBtn" onclick="sendCommand('OFF')">OFF</button>
 
 <p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script>
+  // HiveMQ Cloud MQTT broker WSS URL
+  const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
+
+  // MQTT connection options
+  const options = {
+    username: 'tohits',
+    password: 'toh123@TOH',
+    reconnectPeriod: 1000,
+    clean: true,
+    connectTimeout: 4000,
+  };
+
+  // Connect client
+  const client = mqtt.connect(broker, options);
+
+  const motorStatusEl = document.getElementById('motorStatus');
+  const mqttStatusEl = document.getElementById('mqttStatus');
+  const onBtn = document.getElementById('onBtn');
+  const offBtn = document.getElementById('offBtn');
+
+  // Update buttons color based on motor status
+  function updateButtonColors(status) {
+    if(status === 'ON') {
+      motorStatusEl.innerText = 'ON';
+      onBtn.style.background = 'limegreen';
+      offBtn.style.background = 'gray';
+    } else if(status === 'OFF') {
+      motorStatusEl.innerText = 'OFF';
+      offBtn.style.background = 'tomato';
+      onBtn.style.background = 'gray';
+    } else {
+      motorStatusEl.innerText = status;
+      onBtn.style.background = 'gray';
+      offBtn.style.background = 'gray';
+    }
+  }
+
+  // Send motor control command
+  function sendCommand(cmd) {
+    if(client.connected) {
+      client.publish('motor/control', cmd);
+    } else {
+      alert('MQTT is not connected!');
+    }
+  }
+
+  // MQTT event handlers
+  client.on('connect', () => {
+    mqttStatusEl.innerText = 'Connected';
+    mqttStatusEl.style.color = 'limegreen';
+
+    // Subscribe to motor status topic
+    client.subscribe('motor/status', (err) => {
+      if(err) {
+        console.error('Subscribe error:', err);
+      }
+    });
+  });
+
+  client.on('reconnect', () => {
+    mqttStatusEl.innerText = 'Reconnecting...';
+    mqttStatusEl.style.color = 'orange';
+  });
+
+  client.on('error', (error) => {
+    mqttStatusEl.innerText = 'Error';
+    mqttStatusEl.style.color = 'red';
+    console.error('MQTT Error:', error);
+  });
+
+  client.on('offline', () => {
+    mqttStatusEl.innerText = 'Offline';
+    mqttStatusEl.style.color = 'red';
+  });
+
+  client.on('close', () => {
+    mqttStatusEl.innerText = 'Disconnected';
+    mqttStatusEl.style.color = 'red';
+  });
+
+  // Message received from broker
+  client.on('message', (topic, message) => {
+    if(topic === 'motor/status') {
+      const status = message.toString();
+      updateButtonColors(status);
+    }
+  });
+
+</script>
 
 </body>
 </html>
