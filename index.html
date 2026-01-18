@@ -40,6 +40,25 @@
     font-weight: bold;
     font-size: 20px;
   }
+
+  /* Water level bar */
+  #waterLevelContainer {
+    width: 80%;
+    background: #ddd;
+    margin: 20px auto;
+    border-radius: 15px;
+    overflow: hidden;
+  }
+  #waterLevelBar {
+    width: 0%;
+    height: 40px;
+    background: #00bfff;
+    text-align: center;
+    line-height: 40px;
+    color: white;
+    font-weight: bold;
+    transition: width 0.5s;
+  }
 </style>
 </head>
 <body>
@@ -51,6 +70,11 @@
 <button id="offBtn" onclick="sendCommand('OFF')">OFF</button>
 
 <p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
+
+<h2>Water Level</h2>
+<div id="waterLevelContainer">
+  <div id="waterLevelBar">0%</div>
+</div>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
@@ -73,6 +97,7 @@
   const mqttStatusEl = document.getElementById('mqttStatus');
   const onBtn = document.getElementById('onBtn');
   const offBtn = document.getElementById('offBtn');
+  const waterLevelBar = document.getElementById('waterLevelBar');
 
   // Update buttons color based on motor status
   function updateButtonColors(status) {
@@ -105,11 +130,9 @@
     mqttStatusEl.innerText = 'Connected';
     mqttStatusEl.style.color = 'limegreen';
 
-    // Subscribe to motor status topic
-    client.subscribe('motor/status', (err) => {
-      if(err) {
-        console.error('Subscribe error:', err);
-      }
+    // Subscribe to motor status and water level
+    client.subscribe(['motor/status', 'sensor/waterLevel'], (err) => {
+      if(err) console.error('Subscribe error:', err);
     });
   });
 
@@ -136,12 +159,16 @@
 
   // Message received from broker
   client.on('message', (topic, message) => {
+    const msg = message.toString();
     if(topic === 'motor/status') {
-      const status = message.toString();
-      updateButtonColors(status);
+      updateButtonColors(msg);
+    } else if(topic === 'sensor/waterLevel') {
+      // Update water level bar
+      const level = parseInt(msg);
+      waterLevelBar.style.width = level + '%';
+      waterLevelBar.innerText = level + '%';
     }
   });
-
 </script>
 
 </body>
