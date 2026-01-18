@@ -1,42 +1,75 @@
-const char* htmlPage = R"rawliteral(
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Motor Control</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3-Phase Motor Control</title>
 <style>
-body {font-family:Arial;text-align:center;}
-h2 {color:#333;}
-button {
-  width:150px;height:60px;font-size:20px;margin:15px;
-  border:none;border-radius:12px;color:white;cursor:pointer;
-  box-shadow: 0 5px #666;transition:0.2s;
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f4f4f9;
+    color: #333;
 }
-button:active {box-shadow: 0 2px #666; transform: translateY(4px);}
-#onBtn {background:gray;}
-#offBtn {background:gray;}
+h2 {
+    margin-top: 30px;
+}
+p {
+    font-size: 22px;
+}
+button {
+    width: 160px;
+    height: 70px;
+    font-size: 22px;
+    margin: 15px;
+    border: none;
+    border-radius: 15px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 5px #666;
+    transition: 0.2s;
+}
+button:active {
+    box-shadow: 0 2px #666;
+    transform: translateY(4px);
+}
+#onBtn { background: gray; }
+#offBtn { background: gray; }
 </style>
 <script>
-// AJAX send command
-function sendCommand(cmd){fetch('/'+cmd);}
+// ===== Replace this with your NodeMCU IP =====
+const ESP_IP = "192.168.1.123"; 
 
-// Poll motor status every 500ms
-function updateStatus(){
-  fetch('/status').then(r=>r.text()).then(d=>{
-    document.getElementById('status').innerHTML=d;
-    if(d=='ON'){document.getElementById('onBtn').style.background='limegreen';
-                 document.getElementById('offBtn').style.background='gray';}
-    else{document.getElementById('offBtn').style.background='tomato';
-         document.getElementById('onBtn').style.background='gray';}
-  });
+function sendCommand(cmd) {
+    fetch(`http://${ESP_IP}/${cmd}`);
 }
-setInterval(updateStatus,500);
+
+function updateStatus() {
+    fetch(`http://${ESP_IP}/status`)
+        .then(response => response.text())
+        .then(status => {
+            document.getElementById('status').innerText = status;
+            if(status === "ON") {
+                document.getElementById('onBtn').style.background = 'limegreen';
+                document.getElementById('offBtn').style.background = 'gray';
+            } else {
+                document.getElementById('offBtn').style.background = 'tomato';
+                document.getElementById('onBtn').style.background = 'gray';
+            }
+        });
+}
+
+// Poll every 500ms
+setInterval(updateStatus, 500);
+window.onload = updateStatus;
 </script>
 </head>
 <body>
+
 <h2>3-Phase Motor Control</h2>
-<p>Status: <b id='status'>OFF</b></p>
-<button id='onBtn' onclick="sendCommand('on')">ON</button>
-<button id='offBtn' onclick="sendCommand('off')">OFF</button>
+<p>Status: <b id="status">OFF</b></p>
+<button id="onBtn" onclick="sendCommand('on')">ON</button>
+<button id="offBtn" onclick="sendCommand('off')">OFF</button>
+
 </body>
 </html>
-)rawliteral";
