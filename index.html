@@ -35,6 +35,11 @@ button:active {
 }
 #onBtn { background: gray; }
 #offBtn { background: gray; }
+
+#mqttStatus {
+    font-weight: bold;
+    font-size: 20px;
+}
 </style>
 <script>
 // ===== Replace this with your NodeMCU IP =====
@@ -45,17 +50,27 @@ function sendCommand(cmd) {
 }
 
 function updateStatus() {
+    // Motor status
     fetch(`http://${ESP_IP}/status`)
-        .then(response => response.text())
-        .then(status => {
-            document.getElementById('status').innerText = status;
-            if(status === "ON") {
-                document.getElementById('onBtn').style.background = 'limegreen';
-                document.getElementById('offBtn').style.background = 'gray';
+        .then(r=>r.text())
+        .then(d=>{
+            document.getElementById('status').innerText = d;
+            if(d === 'ON'){
+                document.getElementById('onBtn').style.background='limegreen';
+                document.getElementById('offBtn').style.background='gray';
             } else {
-                document.getElementById('offBtn').style.background = 'tomato';
-                document.getElementById('onBtn').style.background = 'gray';
+                document.getElementById('offBtn').style.background='tomato';
+                document.getElementById('onBtn').style.background='gray';
             }
+        });
+
+    // MQTT status
+    fetch(`http://${ESP_IP}/mqttstatus`)
+        .then(r=>r.text())
+        .then(d=>{
+            document.getElementById('mqttStatus').innerText = d;
+            if(d === 'Connected') document.getElementById('mqttStatus').style.color='limegreen';
+            else document.getElementById('mqttStatus').style.color='red';
         });
 }
 
@@ -67,9 +82,12 @@ window.onload = updateStatus;
 <body>
 
 <h2>3-Phase Motor Control</h2>
-<p>Status: <b id="status">OFF</b></p>
+
+<p>Motor Status: <b id="status">OFF</b></p>
 <button id="onBtn" onclick="sendCommand('on')">ON</button>
 <button id="offBtn" onclick="sendCommand('off')">OFF</button>
+
+<p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
 
 </body>
 </html>
