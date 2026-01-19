@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>3-Phase Motor Control with MQTT</title>
+<title>3-Phase Motor & 4-Relay Control with MQTT</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -15,40 +15,72 @@
     margin-top: 30px;
   }
   p {
-    font-size: 22px;
+    font-size: 20px;
   }
   button {
-    width: 160px;
-    height: 70px;
-    font-size: 22px;
-    margin: 15px;
+    width: 120px;
+    height: 50px;
+    font-size: 18px;
+    margin: 10px;
     border: none;
-    border-radius: 15px;
+    border-radius: 12px;
     color: white;
     cursor: pointer;
-    box-shadow: 0 5px #666;
+    box-shadow: 0 4px #666;
     transition: 0.2s;
   }
   button:active {
     box-shadow: 0 2px #666;
-    transform: translateY(4px);
+    transform: translateY(2px);
   }
-  #onBtn { background: gray; }
-  #offBtn { background: gray; }
+  #onBtn, #offBtn, .relay-on, .relay-off { background: gray; }
+
+  .relay-container {
+    margin-top: 25px;
+    border-top: 1px solid #ccc;
+    padding-top: 15px;
+  }
 
   #mqttStatus {
     font-weight: bold;
-    font-size: 20px;
+    font-size: 18px;
   }
 </style>
 </head>
 <body>
 
 <h2>3-Phase Motor Control</h2>
-
 <p>Motor Status: <b id="motorStatus">OFF</b></p>
-<button id="onBtn" onclick="sendCommand('ON')">ON</button>
-<button id="offBtn" onclick="sendCommand('OFF')">OFF</button>
+<button id="onBtn" onclick="sendMotorCommand('ON')">ON</button>
+<button id="offBtn" onclick="sendMotorCommand('OFF')">OFF</button>
+
+<div class="relay-container">
+  <h2>Extra Relays Control</h2>
+
+  <div>
+    <p>Relay 1 Status: <b id="relay1Status">OFF</b></p>
+    <button class="relay-on" onclick="sendRelayCommand(1,'ON')">ON</button>
+    <button class="relay-off" onclick="sendRelayCommand(1,'OFF')">OFF</button>
+  </div>
+
+  <div>
+    <p>Relay 2 Status: <b id="relay2Status">OFF</b></p>
+    <button class="relay-on" onclick="sendRelayCommand(2,'ON')">ON</button>
+    <button class="relay-off" onclick="sendRelayCommand(2,'OFF')">OFF</button>
+  </div>
+
+  <div>
+    <p>Relay 3 Status: <b id="relay3Status">OFF</b></p>
+    <button class="relay-on" onclick="sendRelayCommand(3,'ON')">ON</button>
+    <button class="relay-off" onclick="sendRelayCommand(3,'OFF')">OFF</button>
+  </div>
+
+  <div>
+    <p>Relay 4 Status: <b id="relay4Status">OFF</b></p>
+    <button class="relay-on" onclick="sendRelayCommand(4,'ON')">ON</button>
+    <button class="relay-off" onclick="sendRelayCommand(4,'OFF')">OFF</button>
+  </div>
+</div>
 
 <p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
 
@@ -57,7 +89,6 @@
   // HiveMQ Cloud MQTT broker WSS URL
   const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
 
-  // MQTT connection options
   const options = {
     username: 'tohits',
     password: 'toh123@TOH',
@@ -66,51 +97,65 @@
     connectTimeout: 4000,
   };
 
-  // Connect client
   const client = mqtt.connect(broker, options);
 
   const motorStatusEl = document.getElementById('motorStatus');
   const mqttStatusEl = document.getElementById('mqttStatus');
+
+  const relayStatusEls = [
+    document.getElementById('relay1Status'),
+    document.getElementById('relay2Status'),
+    document.getElementById('relay3Status'),
+    document.getElementById('relay4Status')
+  ];
+
+  // Update motor buttons
   const onBtn = document.getElementById('onBtn');
   const offBtn = document.getElementById('offBtn');
-
-  // Update buttons color based on motor status
-  function updateButtonColors(status) {
+  function updateMotorButtonColors(status) {
     if(status === 'ON') {
       motorStatusEl.innerText = 'ON';
       onBtn.style.background = 'limegreen';
       offBtn.style.background = 'gray';
-    } else if(status === 'OFF') {
+    } else {
       motorStatusEl.innerText = 'OFF';
       offBtn.style.background = 'tomato';
       onBtn.style.background = 'gray';
-    } else {
-      motorStatusEl.innerText = status;
-      onBtn.style.background = 'gray';
-      offBtn.style.background = 'gray';
     }
   }
 
-  // Send motor control command
-  function sendCommand(cmd) {
-    if(client.connected) {
-      client.publish('motor/control', cmd);
+  // Update relay buttons
+  function updateRelayStatus(relay, status) {
+    relayStatusEls[relay-1].innerText = status;
+    const buttons = relayStatusEls[relay-1].parentNode.querySelectorAll('button');
+    if(status === 'ON') {
+      buttons[0].style.background = 'limegreen';
+      buttons[1].style.background = 'gray';
     } else {
-      alert('MQTT is not connected!');
+      buttons[0].style.background = 'gray';
+      buttons[1].style.background = 'tomato';
     }
   }
 
-  // MQTT event handlers
+  // Send motor command
+  function sendMotorCommand(cmd) {
+    if(client.connected) client.publish('motor/control', cmd);
+    else alert('MQTT not connected!');
+  }
+
+  // Send relay command
+  function sendRelayCommand(relay, cmd) {
+    if(client.connected) client.publish('relay'+relay+'/control', cmd);
+    else alert('MQTT not connected!');
+  }
+
+  // MQTT events
   client.on('connect', () => {
     mqttStatusEl.innerText = 'Connected';
     mqttStatusEl.style.color = 'limegreen';
 
-    // Subscribe to motor status topic
-    client.subscribe('motor/status', (err) => {
-      if(err) {
-        console.error('Subscribe error:', err);
-      }
-    });
+    client.subscribe('motor/status');
+    for(let i=1;i<=4;i++) client.subscribe('relay'+i+'/status');
   });
 
   client.on('reconnect', () => {
@@ -134,15 +179,18 @@
     mqttStatusEl.style.color = 'red';
   });
 
-  // Message received from broker
   client.on('message', (topic, message) => {
-    if(topic === 'motor/status') {
-      const status = message.toString();
-      updateButtonColors(status);
+    const status = message.toString();
+    if(topic === 'motor/status') updateMotorButtonColors(status);
+    else {
+      for(let i=1;i<=4;i++){
+        if(topic === 'relay'+i+'/status'){
+          updateRelayStatus(i, status);
+        }
+      }
     }
   });
 
 </script>
-
 </body>
 </html>
