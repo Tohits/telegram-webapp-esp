@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4-Channel Relay Control</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align:center; background:#f4f4f9; color:#333; }
+  h2 { margin-top: 30px; }
+  button { width: 140px; height: 60px; font-size:20px; margin:10px; border:none; border-radius:10px; cursor:pointer; color:white; }
+  button:active { transform:translateY(2px); }
+  .relay-on { background: limegreen; }
+  .relay-off { background: tomato; }
+  .relay-unknown { background: gray; }
+  #mqttStatus { font-weight:bold; font-size:18px; margin-top:20px; }
+</style>
+</head>
+<body>
+
+<h2>4-Channel Relay Control</h2>
+
+<div>
+  <p>Relay 1 Status: <b id="relay1Status">--</b></p>
+  <button id="relay1Btn" onclick="toggleRelay(1)">Toggle Relay 1</button>
+</div>
+<div>
+  <p>Relay 2 Status: <b id="relay2Status">--</b></p>
+  <button id="relay2Btn" onclick="toggleRelay(2)">Toggle Relay 2</button>
+</div>
+<div>
+  <p>Relay 3 Status: <b id="relay3Status">--</b></p>
+  <button id="relay3Btn" onclick="toggleRelay(3)">Toggle Relay 3</button>
+</div>
+<div>
+  <p>Relay 4 Status: <b id="relay4Status">--</b></p>
+  <button id="relay4Btn" onclick="toggleRelay(4)">Toggle Relay 4</button>
+</div>
+
+<p id="mqttStatus">MQTT: Disconnected</p>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script>
+// ------------------------ MQTT SETUP ------------------------
+const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
+const options = {
+  username: 'tohits',
+  password: 'toh123@TOH',
+  reconnectPeriod: 1000,
+  clean: true,
+  connectTimeout: 4000,
+};
+const client = mqtt.connect(broker, options);
+
+// ------------------------ UI ELEMENTS ------------------------
+let relayStatus = [null,"OFF","OFF","OFF","OFF"];
+const statusEls = [
+  null,
+  document.getElementById("relay1Status"),
+  document.getElementById("relay2Status"),
+  document.getElementById("relay3Status"),
+  document.getElementById("relay4Status")
+];
+const btnEls = [
+  null,
+  document.getElementById("relay1Btn"),
+  document.getElementById("relay2Btn"),
+  document.getElementById("relay3Btn"),
+  document.getElementById("relay4Btn")
+];
+const mqttStatusEl = document.getElementById("mqttStatus");
+
+// ------------------------ UI UPDATE ------------------------
+function updateRelayUI(ch){
+  statusEls[ch].innerText = relayStatus[ch];
+  if(relayStatus[ch]==="ON") btnEls[ch].className="relay-on";
+  else if(relayStatus[ch]==="OFF") btnEls[ch].className="relay-off";
+  else btnEls[ch].className="relay-unknown";
+}
+
+// ------------------------ TOGGLE RELAY ------------------------
+function toggleRelay(ch){
+  const cmd = relayStatus[ch]==="ON"?"OFF":"ON";
+  client.publish(`relay${ch}/control`, cmd);
+}
+
+// ------------------------ MQTT EVENTS ------------------------
+client.on("connect", () => {
+  mqttStatusEl.innerText = "MQTT: Connected";
+  mqttStatusEl.style.color = "limegreen";
+  // Subscribe to relay status topics
+  for(let i=1;i<=4;i++){
+    client.subscribe(`relay${i}/status`);
+  }
+});
+
+client.on("reconnect", () => {
+  mqttStatusEl.innerText = "MQTT: Reconnecting...";
+  mqttStatusEl.style.color = "orange";
+});
+
+client.on("offline", () => {
+  mqttStatusEl.innerText = "MQTT: Offline";
+  mqttStatusEl.style.color = "red";
+});
+
+client.on("error", () => {
+  mqttStatusEl.innerText = "MQTT: Error";
+  mqttStatusEl.style.color = "red";
+});
+
+client.on("message", (topic, message) => {
+  const msg = message.toString();
+  for(let i=1;i<=4;i++){
+    if(topic===`relay${i}/status`){
+      relayStatus[i]=msg;
+      updateRelayUI(i);
+    }
+  }
+});
+</script>
+</body>
+</html>
