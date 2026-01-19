@@ -15,20 +15,17 @@
   h2 { margin-top: 30px; }
   p { font-size: 22px; }
   button {
-    width: 120px;
-    height: 50px;
-    font-size: 18px;
-    margin: 5px;
+    width: 160px;
+    height: 70px;
+    font-size: 22px;
+    margin: 10px;
     border: none;
-    border-radius: 12px;
+    border-radius: 15px;
     color: white;
     cursor: pointer;
-    box-shadow: 0 4px #666;
+    box-shadow: 0 5px #666;
   }
-  button:active {
-    box-shadow: 0 2px #666;
-    transform: translateY(4px);
-  }
+  button:active { box-shadow: 0 2px #666; transform: translateY(4px); }
   .on { background: limegreen; }
   .off { background: tomato; }
   .idle { background: gray; }
@@ -40,106 +37,84 @@
 
 <h2>Motor Control</h2>
 <p>Status: <b id="motorStatus">OFF</b></p>
-<button id="motorOn" class="idle" onclick="sendCommand('motor/control','ON')">ON</button>
-<button id="motorOff" class="idle" onclick="sendCommand('motor/control','OFF')">OFF</button>
+<button id="motorOn" class="idle" onclick="send('motor/control','ON')">ON</button>
+<button id="motorOff" class="idle" onclick="send('motor/control','OFF')">OFF</button>
 
 <hr>
 
 <h2>Relay Controls</h2>
 
 <div>
-  <p>Relay 1 (D2) Status: <b id="r1Status">OFF</b></p>
-  <button id="r1On" class="idle" onclick="sendCommand('relay/1','ON')">ON</button>
-  <button id="r1Off" class="idle" onclick="sendCommand('relay/1','OFF')">OFF</button>
+  <p>Relay 1</p>
+  <button id="relay1On" class="idle" onclick="send('relay/1','ON')">ON</button>
+  <button id="relay1Off" class="idle" onclick="send('relay/1','OFF')">OFF</button>
 </div>
 
 <div>
-  <p>Relay 2 (D3) Status: <b id="r2Status">OFF</b></p>
-  <button id="r2On" class="idle" onclick="sendCommand('relay/2','ON')">ON</button>
-  <button id="r2Off" class="idle" onclick="sendCommand('relay/2','OFF')">OFF</button>
+  <p>Relay 2</p>
+  <button id="relay2On" class="idle" onclick="send('relay/2','ON')">ON</button>
+  <button id="relay2Off" class="idle" onclick="send('relay/2','OFF')">OFF</button>
 </div>
 
 <div>
-  <p>Relay 3 (D4) Status: <b id="r3Status">OFF</b></p>
-  <button id="r3On" class="idle" onclick="sendCommand('relay/3','ON')">ON</button>
-  <button id="r3Off" class="idle" onclick="sendCommand('relay/3','OFF')">OFF</button>
+  <p>Relay 3</p>
+  <button id="relay3On" class="idle" onclick="send('relay/3','ON')">ON</button>
+  <button id="relay3Off" class="idle" onclick="send('relay/3','OFF')">OFF</button>
 </div>
 
 <div>
-  <p>Relay 4 (D7) Status: <b id="r4Status">OFF</b></p>
-  <button id="r4On" class="idle" onclick="sendCommand('relay/4','ON')">ON</button>
-  <button id="r4Off" class="idle" onclick="sendCommand('relay/4','OFF')">OFF</button>
+  <p>Relay 4</p>
+  <button id="relay4On" class="idle" onclick="send('relay/4','ON')">ON</button>
+  <button id="relay4Off" class="idle" onclick="send('relay/4','OFF')">OFF</button>
 </div>
 
 <hr>
-
-<h2>Water Level</h2>
-<p><b id="waterLevel">--%</b></p>
 
 <p>MQTT Status: <b id="mqttStatus">Disconnected</b></p>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
-const options = { username: 'tohits', password: 'toh123@TOH', reconnectPeriod: 1000 };
-const client = mqtt.connect(broker, options);
+  const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
+  const options = { username:'tohits', password:'toh123@TOH', reconnectPeriod:1000 };
+  const client = mqtt.connect(broker, options);
 
-// DOM Elements
-const mqttStatus = document.getElementById('mqttStatus');
+  const mqttStatus = document.getElementById('mqttStatus');
+  const motorStatus = document.getElementById('motorStatus');
+  const motorOn = document.getElementById('motorOn');
+  const motorOff = document.getElementById('motorOff');
 
-// Motor
-const motorStatus = document.getElementById('motorStatus');
-const motorOn = document.getElementById('motorOn');
-const motorOff = document.getElementById('motorOff');
+  const relays = [
+    {on: document.getElementById('relay1On'), off: document.getElementById('relay1Off')},
+    {on: document.getElementById('relay2On'), off: document.getElementById('relay2Off')},
+    {on: document.getElementById('relay3On'), off: document.getElementById('relay3Off')},
+    {on: document.getElementById('relay4On'), off: document.getElementById('relay4Off')}
+  ];
 
-// Relays
-const relays = [
-  { status: document.getElementById('r1Status'), on: document.getElementById('r1On'), off: document.getElementById('r1Off'), topic: 'relay/1' },
-  { status: document.getElementById('r2Status'), on: document.getElementById('r2On'), off: document.getElementById('r2Off'), topic: 'relay/2' },
-  { status: document.getElementById('r3Status'), on: document.getElementById('r3On'), off: document.getElementById('r3Off'), topic: 'relay/3' },
-  { status: document.getElementById('r4Status'), on: document.getElementById('r4On'), off: document.getElementById('r4Off'), topic: 'relay/4' },
-];
+  function send(topic, msg){ if(client.connected) client.publish(topic, msg); else alert("MQTT not connected"); }
 
-// Water
-const waterLevelEl = document.getElementById('waterLevel');
-
-// Send command
-function sendCommand(topic, msg) {
-  if(client.connected) client.publish(topic,msg);
-  else alert("MQTT not connected");
-}
-
-// Update buttons & status
-function updateStatus(elStatus, elOn, elOff, status) {
-  elStatus.innerText = status;
-  if(status==='ON'){ elOn.className='on'; elOff.className='idle'; }
-  else if(status==='OFF'){ elOn.className='idle'; elOff.className='off'; }
-  else{ elOn.className='idle'; elOff.className='idle'; }
-}
-
-// MQTT Events
-client.on('connect', () => {
-  mqttStatus.innerText = 'Connected'; mqttStatus.style.color='green';
-  client.subscribe('motor/status');
-  client.subscribe('relay/1');
-  client.subscribe('relay/2');
-  client.subscribe('relay/3');
-  client.subscribe('relay/4');
-  client.subscribe('sensor/waterLevel');
-});
-
-client.on('offline',()=>{ mqttStatus.innerText='Offline'; mqttStatus.style.color='red'; });
-
-client.on('message', (topic,message)=>{
-  const msg = message.toString();
-  if(topic==='motor/status'){ updateStatus(motorStatus,motorOn,motorOff,msg); }
-  else if(topic==='sensor/waterLevel'){ waterLevelEl.innerText = msg + '%'; }
-  else{
-    for(let r of relays){
-      if(topic===r.topic){ updateStatus(r.status,r.on,r.off,msg); }
-    }
+  function updateButtons(status, onBtn, offBtn){
+    if(status==='ON'){ onBtn.className='on'; offBtn.className='idle'; }
+    else if(status==='OFF'){ onBtn.className='idle'; offBtn.className='off'; }
+    else{ onBtn.className='idle'; offBtn.className='idle'; }
   }
-});
+
+  client.on('connect', () => {
+    mqttStatus.innerText = 'Connected'; mqttStatus.style.color='green';
+    client.subscribe('motor/status');
+    client.subscribe('relay/1'); client.subscribe('relay/2'); client.subscribe('relay/3'); client.subscribe('relay/4');
+  });
+
+  client.on('offline', () => { mqttStatus.innerText='Offline'; mqttStatus.style.color='red'; });
+
+  client.on('message', (topic,message) => {
+    const status = message.toString();
+    if(topic==='motor/status') updateButtons(status, motorOn, motorOff), motorStatus.innerText=status;
+    else if(topic==='relay/1') updateButtons(status, relays[0].on, relays[0].off);
+    else if(topic==='relay/2') updateButtons(status, relays[1].on, relays[1].off);
+    else if(topic==='relay/3') updateButtons(status, relays[2].on, relays[2].off);
+    else if(topic==='relay/4') updateButtons(status, relays[3].on, relays[3].off);
+  });
 </script>
+
 </body>
 </html>
