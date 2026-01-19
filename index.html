@@ -109,10 +109,10 @@
   client.on('message', (topic,message) => {
     const status = message.toString();
     if(topic==='motor/status') updateButtons(status, motorOn, motorOff), motorStatus.innerText=status;
-    else if(topic==='relay/1') updateButtons(status, relays[0].on, relays[0].off);
-    else if(topic==='relay/2') updateButtons(status, relays[1].on, relays[1].off);
-    else if(topic==='relay/3') updateButtons(status, relays[2].on, relays[2].off);
-    else if(topic==='relay/4') updateButtons(status, relays[3].on, relays[3].off);
+    else if(topic==='relay/1') updateButtons(status, relays[0].off, relays[0].on);
+    else if(topic==='relay/2') updateButtons(status, relays[1].off, relays[1].on);
+    else if(topic==='relay/3') updateButtons(status, relays[2].off, relays[2].on);
+    else if(topic==='relay/4') updateButtons(status, relays[3].off, relays[3].on);
   });
 </script>
 
