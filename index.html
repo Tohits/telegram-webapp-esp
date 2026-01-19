@@ -68,7 +68,7 @@
 <h1>Motor, Relays & Water Level Dashboard</h1>
 
 <div class="grid">
-  <!-- Motor Card -->
+  <!-- Motor Card (unchanged) -->
   <div class="card">
     <h2>Motor</h2>
     <div class="status" id="motorStatus">OFF</div>
@@ -76,36 +76,36 @@
     <button class="off" id="motorOffBtn" onclick="sendMotorCommand('OFF')">OFF</button>
   </div>
 
-  <!-- Relay 1 -->
+  <!-- Relay 1 (buttons swapped) -->
   <div class="card">
     <h2>Relay 1</h2>
     <div class="status" id="relay1Status">OFF</div>
-    <button class="on" onclick="sendRelayCommand(1,'ON')">ON</button>
     <button class="off" onclick="sendRelayCommand(1,'OFF')">OFF</button>
+    <button class="on" onclick="sendRelayCommand(1,'ON')">ON</button>
   </div>
 
   <!-- Relay 2 -->
   <div class="card">
     <h2>Relay 2</h2>
     <div class="status" id="relay2Status">OFF</div>
-    <button class="on" onclick="sendRelayCommand(2,'ON')">ON</button>
     <button class="off" onclick="sendRelayCommand(2,'OFF')">OFF</button>
+    <button class="on" onclick="sendRelayCommand(2,'ON')">ON</button>
   </div>
 
   <!-- Relay 3 -->
   <div class="card">
     <h2>Relay 3</h2>
     <div class="status" id="relay3Status">OFF</div>
-    <button class="on" onclick="sendRelayCommand(3,'ON')">ON</button>
     <button class="off" onclick="sendRelayCommand(3,'OFF')">OFF</button>
+    <button class="on" onclick="sendRelayCommand(3,'ON')">ON</button>
   </div>
 
   <!-- Relay 4 -->
   <div class="card">
     <h2>Relay 4</h2>
     <div class="status" id="relay4Status">OFF</div>
-    <button class="on" onclick="sendRelayCommand(4,'ON')">ON</button>
     <button class="off" onclick="sendRelayCommand(4,'OFF')">OFF</button>
+    <button class="on" onclick="sendRelayCommand(4,'ON')">ON</button>
   </div>
 
   <!-- Water Level Card -->
@@ -159,12 +159,13 @@
     }
   }
 
-  // Relay button colors
+  // Relay button colors (buttons swapped)
   function updateRelayStatus(relay,status){
     relayStatusEls[relay-1].innerText=status;
-    const buttons=relayStatusEls[relay-1].parentNode.querySelectorAll('button');
-    if(status==='ON'){ buttons[0].style.background='limegreen'; buttons[1].style.background='gray'; }
-    else{ buttons[0].style.background='gray'; buttons[1].style.background='tomato'; }
+    const buttons = relayStatusEls[relay-1].parentNode.querySelectorAll('button');
+    // buttons[0] = OFF, buttons[1] = ON
+    if(status==='ON'){ buttons[0].style.background='gray'; buttons[1].style.background='limegreen'; }
+    else{ buttons[0].style.background='tomato'; buttons[1].style.background='gray'; }
   }
 
   // Send commands
@@ -186,7 +187,7 @@
   client.on('close',()=>{ mqttStatusEl.innerText='MQTT: Disconnected'; mqttStatusEl.style.color='red'; });
 
   client.on('message',(topic,message)=>{
-    const status=message.toString();
+    const status = message.toString();
     if(topic==='motor/status') updateMotorButtonColors(status);
     else if(topic.startsWith('relay')){
       for(let i=1;i<=4;i++){ if(topic==='relay'+i+'/status') updateRelayStatus(i,status); }
