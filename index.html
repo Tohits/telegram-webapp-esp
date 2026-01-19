@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>3-Phase Motor Control with MQTT</title>
+<title>Motor & Relay Control</title>
+
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -21,152 +22,112 @@
     width: 160px;
     height: 70px;
     font-size: 22px;
-    margin: 15px;
+    margin: 10px;
     border: none;
     border-radius: 15px;
     color: white;
     cursor: pointer;
     box-shadow: 0 5px #666;
-    transition: 0.2s;
   }
   button:active {
     box-shadow: 0 2px #666;
     transform: translateY(4px);
   }
-  #onBtn { background: gray; }
-  #offBtn { background: gray; }
+  .on { background: limegreen; }
+  .off { background: tomato; }
+  .idle { background: gray; }
 
-  #mqttStatus {
-    font-weight: bold;
-    font-size: 20px;
-  }
-
-  /* Water level bar */
-  #waterLevelContainer {
-    width: 80%;
-    background: #ddd;
-    margin: 20px auto;
-    border-radius: 15px;
-    overflow: hidden;
-  }
-  #waterLevelBar {
-    width: 0%;
-    height: 40px;
-    background: #00bfff;
-    text-align: center;
-    line-height: 40px;
-    color: white;
-    font-weight: bold;
-    transition: width 0.5s;
-  }
+  hr { margin: 30px 0; }
 </style>
 </head>
+
 <body>
 
 <h2>3-Phase Motor Control</h2>
+<p>Status: <b id="motorStatus">OFF</b></p>
+<button id="motorOn" class="idle" onclick="send('motor/control','ON')">Motor ON</button>
+<button id="motorOff" class="idle" onclick="send('motor/control','OFF')">Motor OFF</button>
 
-<p>Motor Status: <b id="motorStatus">OFF</b></p>
-<button id="onBtn" onclick="sendCommand('ON')">ON</button>
-<button id="offBtn" onclick="sendCommand('OFF')">OFF</button>
+<hr>
 
-<p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
+<h2>Relay Controls</h2>
 
-<h2>Water Level</h2>
-<div id="waterLevelContainer">
-  <div id="waterLevelBar">0%</div>
+<div>
+  <p>Relay 1</p>
+  <button onclick="send('relay/1','ON')">ON</button>
+  <button onclick="send('relay/1','OFF')">OFF</button>
 </div>
+
+<div>
+  <p>Relay 2</p>
+  <button onclick="send('relay/2','ON')">ON</button>
+  <button onclick="send('relay/2','OFF')">OFF</button>
+</div>
+
+<div>
+  <p>Relay 3</p>
+  <button onclick="send('relay/3','ON')">ON</button>
+  <button onclick="send('relay/3','OFF')">OFF</button>
+</div>
+
+<div>
+  <p>Relay 4</p>
+  <button onclick="send('relay/4','ON')">ON</button>
+  <button onclick="send('relay/4','OFF')">OFF</button>
+</div>
+
+<hr>
+
+<p>MQTT Status: <b id="mqttStatus">Disconnected</b></p>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-  // HiveMQ Cloud MQTT broker WSS URL
   const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
 
-  // MQTT connection options
   const options = {
     username: 'tohits',
     password: 'toh123@TOH',
-    reconnectPeriod: 1000,
-    clean: true,
-    connectTimeout: 4000,
+    reconnectPeriod: 1000
   };
 
-  // Connect client
   const client = mqtt.connect(broker, options);
 
-  const motorStatusEl = document.getElementById('motorStatus');
-  const mqttStatusEl = document.getElementById('mqttStatus');
-  const onBtn = document.getElementById('onBtn');
-  const offBtn = document.getElementById('offBtn');
-  const waterLevelBar = document.getElementById('waterLevelBar');
+  const mqttStatus = document.getElementById('mqttStatus');
+  const motorStatus = document.getElementById('motorStatus');
+  const motorOn = document.getElementById('motorOn');
+  const motorOff = document.getElementById('motorOff');
 
-  // Update buttons color based on motor status
-  function updateButtonColors(status) {
-    if(status === 'ON') {
-      motorStatusEl.innerText = 'ON';
-      onBtn.style.background = 'limegreen';
-      offBtn.style.background = 'gray';
-    } else if(status === 'OFF') {
-      motorStatusEl.innerText = 'OFF';
-      offBtn.style.background = 'tomato';
-      onBtn.style.background = 'gray';
+  function send(topic, msg) {
+    if (client.connected) {
+      client.publish(topic, msg);
     } else {
-      motorStatusEl.innerText = status;
-      onBtn.style.background = 'gray';
-      offBtn.style.background = 'gray';
+      alert("MQTT not connected");
     }
   }
 
-  // Send motor control command
-  function sendCommand(cmd) {
-    if(client.connected) {
-      client.publish('motor/control', cmd);
-    } else {
-      alert('MQTT is not connected!');
-    }
-  }
-
-  // MQTT event handlers
   client.on('connect', () => {
-    mqttStatusEl.innerText = 'Connected';
-    mqttStatusEl.style.color = 'limegreen';
-
-    // Subscribe to motor status and water level
-    client.subscribe(['motor/status', 'sensor/waterLevel'], (err) => {
-      if(err) console.error('Subscribe error:', err);
-    });
-  });
-
-  client.on('reconnect', () => {
-    mqttStatusEl.innerText = 'Reconnecting...';
-    mqttStatusEl.style.color = 'orange';
-  });
-
-  client.on('error', (error) => {
-    mqttStatusEl.innerText = 'Error';
-    mqttStatusEl.style.color = 'red';
-    console.error('MQTT Error:', error);
+    mqttStatus.innerText = 'Connected';
+    mqttStatus.style.color = 'green';
+    client.subscribe('motor/status');
   });
 
   client.on('offline', () => {
-    mqttStatusEl.innerText = 'Offline';
-    mqttStatusEl.style.color = 'red';
+    mqttStatus.innerText = 'Offline';
+    mqttStatus.style.color = 'red';
   });
 
-  client.on('close', () => {
-    mqttStatusEl.innerText = 'Disconnected';
-    mqttStatusEl.style.color = 'red';
-  });
-
-  // Message received from broker
   client.on('message', (topic, message) => {
-    const msg = message.toString();
-    if(topic === 'motor/status') {
-      updateButtonColors(msg);
-    } else if(topic === 'sensor/waterLevel') {
-      // Update water level bar
-      const level = parseInt(msg);
-      waterLevelBar.style.width = level + '%';
-      waterLevelBar.innerText = level + '%';
+    if (topic === 'motor/status') {
+      const status = message.toString();
+      motorStatus.innerText = status;
+
+      if (status === 'ON') {
+        motorOn.className = 'on';
+        motorOff.className = 'idle';
+      } else {
+        motorOff.className = 'off';
+        motorOn.className = 'idle';
+      }
     }
   });
 </script>
