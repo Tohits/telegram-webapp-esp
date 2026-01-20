@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>3-Phase Motor Control with MQTT</title>
-
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -43,73 +42,87 @@
   }
 </style>
 </head>
-
 <body>
 
 <h2>3-Phase Motor Control</h2>
 
 <p>Motor Status: <b id="motorStatus">OFF</b></p>
-
 <button id="onBtn" onclick="sendCommand('ON')">ON</button>
 <button id="offBtn" onclick="sendCommand('OFF')">OFF</button>
 
-<p>Water Level: <b id="waterLevel">--%</b></p>
-
 <p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
+
+<!-- ✅ ADDED: ESP WiFi Status -->
+<p>ESP WiFi Status: <b id="espStatus">Unknown</b></p>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-  // HiveMQ Cloud WebSocket URL
+  // HiveMQ Cloud MQTT broker WSS URL
   const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
 
+  // MQTT connection options
   const options = {
     username: 'tohits',
     password: 'toh123@TOH',
     reconnectPeriod: 1000,
+    clean: true,
     connectTimeout: 4000,
-    clean: true
   };
 
+  // Connect client
   const client = mqtt.connect(broker, options);
 
   const motorStatusEl = document.getElementById('motorStatus');
-  const mqttStatusEl  = document.getElementById('mqttStatus');
-  const waterLevelEl  = document.getElementById('waterLevel');
-  const onBtn  = document.getElementById('onBtn');
+  const mqttStatusEl = document.getElementById('mqttStatus');
+  const espStatusEl  = document.getElementById('espStatus');
+  const onBtn = document.getElementById('onBtn');
   const offBtn = document.getElementById('offBtn');
 
+  // Update buttons color based on motor status
   function updateButtonColors(status) {
-    if (status === 'ON') {
+    if(status === 'ON') {
       motorStatusEl.innerText = 'ON';
       onBtn.style.background = 'limegreen';
       offBtn.style.background = 'gray';
-    } else {
+    } else if(status === 'OFF') {
       motorStatusEl.innerText = 'OFF';
       offBtn.style.background = 'tomato';
       onBtn.style.background = 'gray';
+    } else {
+      motorStatusEl.innerText = status;
+      onBtn.style.background = 'gray';
+      offBtn.style.background = 'gray';
     }
   }
 
+  // Send motor control command
   function sendCommand(cmd) {
-    if (client.connected) {
+    if(client.connected) {
       client.publish('motor/control', cmd);
     } else {
-      alert('MQTT not connected');
+      alert('MQTT is not connected!');
     }
   }
 
+  // MQTT event handlers
   client.on('connect', () => {
     mqttStatusEl.innerText = 'Connected';
     mqttStatusEl.style.color = 'limegreen';
 
-    // ✅ SUBSCRIBE TO BOTH TOPICS
+    // Subscribe to topics
     client.subscribe('motor/status');
-    client.subscribe('sensor/waterLevel');
+    client.subscribe('esp/status'); // ✅ ADDED
   });
 
   client.on('reconnect', () => {
     mqttStatusEl.innerText = 'Reconnecting...';
     mqttStatusEl.style.color = 'orange';
+  });
+
+  client.on('error', (error) => {
+    mqttStatusEl.innerText = 'Error';
+    mqttStatusEl.style.color = 'red';
+    console.error('MQTT Error:', error);
   });
 
   client.on('offline', () => {
@@ -122,18 +135,26 @@
     mqttStatusEl.style.color = 'red';
   });
 
-  // ✅ SINGLE MESSAGE HANDLER
+  // Message received from broker
   client.on('message', (topic, message) => {
-    const msg = message.toString();
-
-    if (topic === 'motor/status') {
-      updateButtonColors(msg);
+    if(topic === 'motor/status') {
+      const status = message.toString();
+      updateButtonColors(status);
     }
 
-    if (topic === 'sensor/waterLevel') {
-      waterLevelEl.innerText = msg + '%';
+    // ✅ ADDED: ESP WiFi status handler
+    if(topic === 'esp/status') {
+      const status = message.toString();
+      if(status === 'ONLINE') {
+        espStatusEl.innerText = 'Connected';
+        espStatusEl.style.color = 'limegreen';
+      } else {
+        espStatusEl.innerText = 'Disconnected';
+        espStatusEl.style.color = 'red';
+      }
     }
   });
+
 </script>
 
 </body>
