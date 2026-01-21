@@ -1,143 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Motor & Water Level Control</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4-Relay Control Dashboard</title>
 
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    text-align: center;
-    background: #f4f4f9;
-    color: #333;
-  }
-  h2 { margin-top: 25px; }
-
-  p {
-    font-size: 22px;
-  }
+  body { font-family: Arial, sans-serif; text-align:center; background:#f4f4f9; color:#333; }
+  h2 { margin-top: 20px; }
+  .relay-container { margin: 20px; }
 
   button {
-    width: 160px;
-    height: 70px;
-    font-size: 22px;
-    margin: 15px;
-    border: none;
-    border-radius: 15px;
-    color: white;
-    cursor: pointer;
-    box-shadow: 0 5px #666;
-    transition: 0.2s;
+    width: 100px;
+    height: 50px;
+    font-size:18px;
+    margin:5px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    color:white;
   }
 
-  button:active {
-    box-shadow: 0 2px #666;
-    transform: translateY(4px);
-  }
+  button:active { transform:translateY(2px); }
 
-  #onBtn  { background: gray; }
-  #offBtn { background: gray; }
+  .on { background: limegreen; }
+  .off { background: tomato; }
+  .disabled { background: gray; cursor: not-allowed; }
 
+  #mqttStatus { font-weight:bold; font-size:18px; margin-top:20px; }
   .green { color: limegreen; }
-  .red   { color: red; }
+  .red { color: red; }
 </style>
 </head>
 
 <body>
 
-<h2>3-Phase Motor Control</h2>
+<h2>Light Control Dashboard</h2>
 
-<p>Motor Status: <b id="motorStatus">OFF</b></p>
-<button id="onBtn"  onclick="sendCommand('ON')">ON</button>
-<button id="offBtn" onclick="sendCommand('OFF')">OFF</button>
+<!-- ---------------- RELAYS ---------------- -->
+<div class="relay-container">
+  <p>LIGHT 1 Status: <b id="relay1Status">--</b></p>
+  <button id="relay1On" onclick="sendCommand(1,'ON')">ON</button>
+  <button id="relay1Off" onclick="sendCommand(1,'OFF')">OFF</button>
+</div>
 
-<p>MQTT Status: <b id="mqttStatus">Disconnected</b></p>
-<p>ESP WiFi Status: <b id="espStatus">Unknown</b></p>
+<div class="relay-container">
+  <p>LIGHT 2 Status: <b id="relay2Status">--</b></p>
+  <button id="relay2On" onclick="sendCommand(2,'ON')">ON</button>
+  <button id="relay2Off" onclick="sendCommand(2,'OFF')">OFF</button>
+</div>
 
-<h2>Water Level</h2>
-<p><b id="waterLevel">--%</b></p>
+<div class="relay-container">
+  <p>LIGHT 3 Status: <b id="relay3Status">--</b></p>
+  <button id="relay3On" onclick="sendCommand(3,'ON')">ON</button>
+  <button id="relay3Off" onclick="sendCommand(3,'OFF')">OFF</button>
+</div>
+
+<div class="relay-container">
+  <p>LIGHT 4 Status: <b id="relay4Status">--</b></p>
+  <button id="relay4On" onclick="sendCommand(4,'ON')">ON</button>
+  <button id="relay4Off" onclick="sendCommand(4,'OFF')">OFF</button>
+</div>
+
+<hr>
+
+<!-- ---------------- ESP STATUS ---------------- -->
+<h2>ESP Status</h2>
+
+<p>ESP WiFi: <b id="espStatus">Unknown</b></p>
+<p>ESP IP: <b id="espIP">--</b></p>
+<p>Uptime: <b id="espUptime">--</b></p>
+
+<button style="background:#444;" onclick="resetESP()">RESET ESP</button>
+
+<p id="mqttStatus">MQTT: Disconnected</p>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-  const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
+// ---------------- MQTT SETUP ----------------
+const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
+const options = {
+  username: 'tohits',
+  password: 'toh123@TOH',
+  reconnectPeriod: 1000,
+  clean: true,
+  connectTimeout: 4000,
+};
+const client = mqtt.connect(broker, options);
 
-  const options = {
-    username: 'tohits',
-    password: 'toh123@TOH',
-    reconnectPeriod: 1000,
-    clean: true,
-    connectTimeout: 4000
-  };
+// ---------------- RELAY STATUS ----------------
+let relayStatus = [null,"OFF","OFF","OFF","OFF"];
 
-  const client = mqtt.connect(broker, options);
+// ---------------- UPDATE UI ----------------
+function updateUI(ch){
+  const statusEl = document.getElementById(`relay${ch}Status`);
+  const onBtn = document.getElementById(`relay${ch}On`);
+  const offBtn = document.getElementById(`relay${ch}Off`);
 
-  const motorStatusEl = document.getElementById('motorStatus');
-  const mqttStatusEl  = document.getElementById('mqttStatus');
-  const espStatusEl   = document.getElementById('espStatus');
-  const waterEl       = document.getElementById('waterLevel');
-  const onBtn  = document.getElementById('onBtn');
-  const offBtn = document.getElementById('offBtn');
+  statusEl.innerText = relayStatus[ch];
 
-  function updateButtonColors(status) {
-    if (status === 'ON') {
-      motorStatusEl.innerText = 'ON';
-      onBtn.style.background = 'limegreen';
-      offBtn.style.background = 'gray';
+  if(relayStatus[ch]==="ON"){
+    onBtn.className="on";
+    offBtn.className="off";
+  } else if(relayStatus[ch]==="OFF"){
+    onBtn.className="off";
+    offBtn.className="on";
+  } else {
+    onBtn.className="disabled";
+    offBtn.className="disabled";
+  }
+}
+
+// ---------------- SEND COMMAND (SWAPPED) ----------------
+function sendCommand(ch, cmd){
+  if(client.connected){
+    let swappedCmd = (cmd === "ON") ? "OFF" : "ON";
+    client.publish(`relay${ch}/control`, swappedCmd);
+  }
+}
+
+// ---------------- RESET ESP ----------------
+function resetESP(){
+  if(confirm("Are you sure you want to reset the ESP?")){
+    client.publish("esp/reset", "1");
+  }
+}
+
+// ---------------- MQTT EVENTS ----------------
+client.on("connect", () => {
+  mqttStatus.innerText = "MQTT: Connected";
+  mqttStatus.style.color = "limegreen";
+
+  for(let i=1;i<=4;i++){
+    client.subscribe(`relay${i}/status`);
+  }
+
+  client.subscribe("esp/status");
+  client.subscribe("esp/ip");
+  client.subscribe("esp/uptime");
+});
+
+client.on("offline", () => {
+  mqttStatus.innerText = "MQTT: Offline";
+  mqttStatus.style.color = "red";
+});
+
+client.on("message", (topic, message) => {
+  const msg = message.toString();
+
+  for(let i=1;i<=4;i++){
+    if(topic===`relay${i}/status`){
+      relayStatus[i] = msg;
+      updateUI(i);
+    }
+  }
+
+  if(topic==="esp/status"){
+    const el = document.getElementById("espStatus");
+    if(msg==="ONLINE"){
+      el.innerText="Connected";
+      el.className="green";
     } else {
-      motorStatusEl.innerText = 'OFF';
-      offBtn.style.background = 'tomato';
-      onBtn.style.background = 'gray';
+      el.innerText="Disconnected";
+      el.className="red";
     }
   }
 
-  function sendCommand(cmd) {
-    if (client.connected) {
-      client.publish('motor/control', cmd);
-    }
+  if(topic==="esp/ip"){
+    document.getElementById("espIP").innerText = msg;
   }
 
-  client.on('connect', () => {
-    mqttStatusEl.innerText = 'Connected';
-    mqttStatusEl.className = 'green';
-
-    client.subscribe('motor/status');
-    client.subscribe('sensor/waterLevel');
-    client.subscribe('esp/status');
-  });
-
-  client.on('offline', () => {
-    mqttStatusEl.innerText = 'Offline';
-    mqttStatusEl.className = 'red';
-  });
-
-  client.on('message', (topic, message) => {
-    const msg = message.toString();
-
-    if (topic === 'motor/status') {
-      updateButtonColors(msg);
+  if(topic==="esp/uptime"){
+    let sec = parseInt(msg);
+    if(!isNaN(sec)){
+      let h = Math.floor(sec/3600);
+      let m = Math.floor((sec%3600)/60);
+      let s = sec%60;
+      document.getElementById("espUptime").innerText =
+        `${h}h ${m}m ${s}s`;
     }
-
-    if (topic === 'sensor/waterLevel') {
-      let value = parseInt(msg);
-      if (isNaN(value)) return;
-
-      if (value < 0) value = 0;
-      if (value > 100) value = 100;
-
-      waterEl.innerText = value + '%';
-    }
-
-    if (topic === 'esp/status') {
-      if (msg === 'ONLINE') {
-        espStatusEl.innerText = 'Connected';
-        espStatusEl.className = 'green';
-      } else {
-        espStatusEl.innerText = 'Disconnected';
-        espStatusEl.className = 'red';
-      }
-    }
-  });
+  }
+});
 </script>
 
 </body>
