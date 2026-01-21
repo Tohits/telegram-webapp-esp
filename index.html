@@ -28,7 +28,7 @@
   button:active { box-shadow: 0 2px #666; transform: translateY(4px); }
   #onBtn { background: gray; }
   #offBtn { background: gray; }
-  #resetBtn { background: #444; color: white; }
+  #resetBtn { background: #444; }
 
   .online { color: limegreen; font-weight: bold; }
   .offline { color: red; font-weight: bold; }
@@ -46,8 +46,7 @@
 
 <p>ESP Status: <span id="espStatus" class="offline">OFFLINE</span></p>
 <p>ESP IP: <b id="espIP">--</b></p>
-<p>ESP Uptime: <b id="espUptime">--:--:--</b></p>
-
+<p>ESP Uptime: <b id="espUptime">00:00:00</b></p>
 <button id="resetBtn" onclick="resetESP()">RESET ESP</button>
 
 <p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
@@ -61,8 +60,8 @@ const options = {
   reconnectPeriod: 1000,
   clean: true,
   connectTimeout: 4000,
-  will: { topic: 'esp/status', payload: 'OFFLINE', qos: 1, retain: true }
 };
+
 const client = mqtt.connect(broker, options);
 
 const motorStatusEl = document.getElementById('motorStatus');
@@ -73,51 +72,75 @@ const espUptimeEl   = document.getElementById('espUptime');
 const onBtn  = document.getElementById('onBtn');
 const offBtn = document.getElementById('offBtn');
 
-function updateButtonColors(status){
+// ----------------- Motor button colors -----------------
+function updateButtonColors(status) {
   motorStatusEl.innerText = status;
-  if(status==='ON'){ onBtn.style.background='limegreen'; offBtn.style.background='gray'; }
-  else if(status==='OFF'){ offBtn.style.background='tomato'; onBtn.style.background='gray'; }
+  if (status === 'ON') {
+    onBtn.style.background = 'limegreen';
+    offBtn.style.background = 'gray';
+  } else if (status === 'OFF') {
+    offBtn.style.background = 'tomato';
+    onBtn.style.background = 'gray';
+  }
 }
 
-function sendCommand(cmd){
-  if(client.connected) client.publish('motor/control', cmd);
+// ----------------- Send motor command -----------------
+function sendCommand(cmd) {
+  if (client.connected) client.publish('motor/control', cmd);
 }
 
-function resetESP(){
-  if(client.connected && confirm("Reset ESP?")) client.publish('esp/reset','RESET');
+// ----------------- Reset ESP -----------------
+function resetESP() {
+  if (client.connected && confirm("Reset ESP?")) {
+    client.publish('esp/reset', 'RESET'); // matches ESP code
+  }
 }
 
-// ---------- MQTT EVENTS ----------
+// ----------------- MQTT Events -----------------
 client.on('connect', () => {
   mqttStatusEl.innerText = 'Connected';
   mqttStatusEl.style.color = 'limegreen';
-  client.subscribe(['motor/status','esp/status','esp/ip','esp/uptime']);
+
+  client.subscribe([
+    'motor/status',
+    'esp/status',
+    'esp/ip',
+    'esp/uptime'
+  ]);
 });
 
-client.on('reconnect', () => { mqttStatusEl.innerText='Reconnecting...'; mqttStatusEl.style.color='orange'; });
+client.on('reconnect', () => {
+  mqttStatusEl.innerText = 'Reconnecting...';
+  mqttStatusEl.style.color = 'orange';
+});
+
 client.on('offline', () => {
-  mqttStatusEl.innerText='Offline'; mqttStatusEl.style.color='red';
-  espStatusEl.innerText = 'OFFLINE'; espStatusEl.className='offline';
+  mqttStatusEl.innerText = 'Offline';
+  mqttStatusEl.style.color = 'red';
+  // mark ESP offline if MQTT lost connection
+  espStatusEl.innerText = 'OFFLINE';
+  espStatusEl.className = 'offline';
 });
-client.on('error', () => { mqttStatusEl.innerText='Error'; mqttStatusEl.style.color='red'; });
 
-client.on('message', (topic,message)=>{
+client.on('error', () => {
+  mqttStatusEl.innerText = 'Error';
+  mqttStatusEl.style.color = 'red';
+});
+
+// ----------------- MQTT Messages -----------------
+client.on('message', (topic, message) => {
   const msg = message.toString();
-  if(topic==='motor/status') updateButtonColors(msg);
 
-  if(topic==='esp/status'){
+  if (topic === 'motor/status') updateButtonColors(msg);
+
+  if (topic === 'esp/status') {
     espStatusEl.innerText = msg;
-    espStatusEl.className = (msg==='ONLINE')?'online':'offline';
+    espStatusEl.className = (msg === 'ONLINE') ? 'online' : 'offline';
   }
-  if(topic==='esp/ip') espIPEl.innerText = msg;
 
-  if(topic==='esp/uptime'){
-    let totalSec = parseInt(msg);
-    let h = Math.floor(totalSec/3600);
-    let m = Math.floor((totalSec%3600)/60);
-    let s = totalSec%60;
-    espUptimeEl.innerText = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  }
+  if (topic === 'esp/ip') espIPEl.innerText = msg;
+
+  if (topic === 'esp/uptime') espUptimeEl.innerText = msg;
 });
 </script>
 
