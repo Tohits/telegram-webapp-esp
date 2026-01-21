@@ -12,12 +12,9 @@
     background: #f4f4f9;
     color: #333;
   }
-  h2 {
-    margin-top: 30px;
-  }
-  p {
-    font-size: 20px;
-  }
+  h2 { margin-top: 30px; }
+  p { font-size: 20px; }
+
   button {
     width: 170px;
     height: 65px;
@@ -41,6 +38,23 @@
 
   .online { color: limegreen; font-weight: bold; }
   .offline { color: red; font-weight: bold; }
+
+  .water-box {
+    width: 260px;
+    margin: 15px auto;
+    background: #ddd;
+    border-radius: 15px;
+    overflow: hidden;
+  }
+
+  .water-level {
+    height: 30px;
+    background: #2196f3;
+    width: 0%;
+    color: white;
+    font-weight: bold;
+    line-height: 30px;
+  }
 </style>
 </head>
 
@@ -58,13 +72,17 @@
 <p>ESP IP: <b id="espIP">--</b></p>
 <p>ESP Uptime: <b id="espUptime">--</b> sec</p>
 
+<p>Water Level:</p>
+<div class="water-box">
+  <div id="waterLevelBar" class="water-level">0%</div>
+</div>
+
 <button id="resetBtn" onclick="resetESP()">RESET ESP</button>
 
 <p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-  // ---------------- MQTT SETUP ----------------
   const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
 
   const options = {
@@ -77,16 +95,15 @@
 
   const client = mqtt.connect(broker, options);
 
-  // ---------------- ELEMENTS ----------------
   const motorStatusEl = document.getElementById('motorStatus');
   const mqttStatusEl  = document.getElementById('mqttStatus');
   const espStatusEl   = document.getElementById('espStatus');
   const espIPEl       = document.getElementById('espIP');
-  const espUptimeEl  = document.getElementById('espUptime');
+  const espUptimeEl   = document.getElementById('espUptime');
+  const waterBar      = document.getElementById('waterLevelBar');
   const onBtn  = document.getElementById('onBtn');
   const offBtn = document.getElementById('offBtn');
 
-  // ---------------- MOTOR UI ----------------
   function updateButtonColors(status) {
     motorStatusEl.innerText = status;
 
@@ -96,32 +113,21 @@
     } else if (status === 'OFF') {
       offBtn.style.background = 'tomato';
       onBtn.style.background = 'gray';
-    } else {
-      onBtn.style.background = 'gray';
-      offBtn.style.background = 'gray';
     }
   }
 
   function sendCommand(cmd) {
     if (client.connected) {
       client.publish('motor/control', cmd);
-    } else {
-      alert('MQTT is not connected!');
     }
   }
 
-  // ---------------- ESP RESET ----------------
   function resetESP() {
-    if (client.connected) {
-      if (confirm("Reset ESP device?")) {
-        client.publish('esp/reset', '1');
-      }
-    } else {
-      alert("MQTT not connected");
+    if (client.connected && confirm("Reset ESP?")) {
+      client.publish('esp/reset', '1');
     }
   }
 
-  // ---------------- MQTT EVENTS ----------------
   client.on('connect', () => {
     mqttStatusEl.innerText = 'Connected';
     mqttStatusEl.style.color = 'limegreen';
@@ -130,13 +136,9 @@
       'motor/status',
       'esp/status',
       'esp/ip',
-      'esp/uptime'
+      'esp/uptime',
+      'sensor/waterLevel'
     ]);
-  });
-
-  client.on('reconnect', () => {
-    mqttStatusEl.innerText = 'Reconnecting...';
-    mqttStatusEl.style.color = 'orange';
   });
 
   client.on('offline', () => {
@@ -144,12 +146,6 @@
     mqttStatusEl.style.color = 'red';
   });
 
-  client.on('error', () => {
-    mqttStatusEl.innerText = 'Error';
-    mqttStatusEl.style.color = 'red';
-  });
-
-  // ---------------- MQTT MESSAGES ----------------
   client.on('message', (topic, message) => {
     const msg = message.toString();
 
@@ -158,13 +154,8 @@
     }
 
     if (topic === 'esp/status') {
-      if (msg === 'ONLINE') {
-        espStatusEl.innerText = 'ONLINE';
-        espStatusEl.className = 'online';
-      } else {
-        espStatusEl.innerText = 'OFFLINE';
-        espStatusEl.className = 'offline';
-      }
+      espStatusEl.innerText = msg;
+      espStatusEl.className = (msg === 'ONLINE') ? 'online' : 'offline';
     }
 
     if (topic === 'esp/ip') {
@@ -173,6 +164,15 @@
 
     if (topic === 'esp/uptime') {
       espUptimeEl.innerText = msg;
+    }
+
+    if (topic === 'sensor/waterLevel') {
+      let level = parseInt(msg);
+      if (level < 0) level = 0;
+      if (level > 100) level = 100;
+
+      waterBar.style.width = level + '%';
+      waterBar.innerText = level + '%';
     }
   });
 </script>
