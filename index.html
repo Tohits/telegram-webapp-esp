@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>3-Phase Motor Control with MQTT</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3-Phase Motor Control Dashboard</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -12,9 +11,8 @@
     background: #f4f4f9;
     color: #333;
   }
-  h2 { margin-top: 30px; }
+  h2 { margin-top: 20px; }
   p { font-size: 20px; }
-
   button {
     width: 170px;
     height: 65px;
@@ -31,7 +29,6 @@
     box-shadow: 0 2px #666;
     transform: translateY(4px);
   }
-
   #onBtn { background: gray; }
   #offBtn { background: gray; }
   #resetBtn { background: #444; }
@@ -46,7 +43,6 @@
     border-radius: 15px;
     overflow: hidden;
   }
-
   .water-level {
     height: 30px;
     background: #2196f3;
@@ -57,7 +53,6 @@
   }
 </style>
 </head>
-
 <body>
 
 <h2>3-Phase Motor Control</h2>
@@ -70,7 +65,7 @@
 
 <p>ESP Status: <span id="espStatus" class="offline">OFFLINE</span></p>
 <p>ESP IP: <b id="espIP">--</b></p>
-<p>ESP Uptime: <b id="espUptime">--</b> sec</p>
+<p>ESP Uptime: <b id="espUptime">--:--:--</b></p>
 
 <p>Water Level:</p>
 <div class="water-box">
@@ -84,7 +79,6 @@
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
   const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
-
   const options = {
     username: 'tohits',
     password: 'toh123@TOH',
@@ -104,9 +98,9 @@
   const onBtn  = document.getElementById('onBtn');
   const offBtn = document.getElementById('offBtn');
 
+  // Motor button colors
   function updateButtonColors(status) {
     motorStatusEl.innerText = status;
-
     if (status === 'ON') {
       onBtn.style.background = 'limegreen';
       offBtn.style.background = 'gray';
@@ -116,18 +110,19 @@
     }
   }
 
+  // Send motor command
   function sendCommand(cmd) {
-    if (client.connected) {
-      client.publish('motor/control', cmd);
-    }
+    if (client.connected) client.publish('motor/control', cmd);
   }
 
+  // Reset ESP
   function resetESP() {
     if (client.connected && confirm("Reset ESP?")) {
-      client.publish('esp/reset', '1');
+      client.publish('esp/reset', 'RESET'); // must match ESP code
     }
   }
 
+  // MQTT events
   client.on('connect', () => {
     mqttStatusEl.innerText = 'Connected';
     mqttStatusEl.style.color = 'limegreen';
@@ -141,36 +136,40 @@
     ]);
   });
 
+  client.on('reconnect', () => {
+    mqttStatusEl.innerText = 'Reconnecting...';
+    mqttStatusEl.style.color = 'orange';
+  });
+
   client.on('offline', () => {
     mqttStatusEl.innerText = 'Offline';
     mqttStatusEl.style.color = 'red';
   });
 
+  client.on('error', () => {
+    mqttStatusEl.innerText = 'Error';
+    mqttStatusEl.style.color = 'red';
+  });
+
+  // MQTT message handling
   client.on('message', (topic, message) => {
     const msg = message.toString();
 
-    if (topic === 'motor/status') {
-      updateButtonColors(msg);
-    }
+    if (topic === 'motor/status') updateButtonColors(msg);
 
     if (topic === 'esp/status') {
       espStatusEl.innerText = msg;
       espStatusEl.className = (msg === 'ONLINE') ? 'online' : 'offline';
     }
 
-    if (topic === 'esp/ip') {
-      espIPEl.innerText = msg;
-    }
+    if (topic === 'esp/ip') espIPEl.innerText = msg;
 
-    if (topic === 'esp/uptime') {
-      espUptimeEl.innerText = msg;
-    }
+    if (topic === 'esp/uptime') espUptimeEl.innerText = msg;
 
     if (topic === 'sensor/waterLevel') {
       let level = parseInt(msg);
       if (level < 0) level = 0;
       if (level > 100) level = 100;
-
       waterBar.style.width = level + '%';
       waterBar.innerText = level + '%';
     }
