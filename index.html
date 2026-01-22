@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3-Phase Motor Control Dashboard</title>
+
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -13,6 +14,7 @@
   }
   h2 { margin-top: 20px; }
   p { font-size: 20px; }
+
   button {
     width: 170px;
     height: 65px;
@@ -25,15 +27,38 @@
     box-shadow: 0 5px #666;
     transition: 0.2s;
   }
-  button:active { box-shadow: 0 2px #666; transform: translateY(4px); }
+  button:active {
+    box-shadow: 0 2px #666;
+    transform: translateY(4px);
+  }
+
   #onBtn { background: gray; }
   #offBtn { background: gray; }
   #resetBtn { background: #444; }
 
   .online { color: limegreen; font-weight: bold; }
   .offline { color: red; font-weight: bold; }
+
+  /* -------- Water Level -------- */
+  .water-box {
+    width: 260px;
+    margin: 15px auto;
+    background: #ddd;
+    border-radius: 15px;
+    overflow: hidden;
+  }
+  .water-level {
+    height: 30px;
+    width: 0%;
+    background: #2196f3;
+    color: white;
+    font-weight: bold;
+    line-height: 30px;
+    transition: width 0.4s;
+  }
 </style>
 </head>
+
 <body>
 
 <h2>3-Phase Motor Control</h2>
@@ -47,6 +72,12 @@
 <p>ESP Status: <span id="espStatus" class="offline">OFFLINE</span></p>
 <p>ESP IP: <b id="espIP">--</b></p>
 <p>ESP Uptime: <b id="espUptime">00:00:00</b></p>
+
+<p>Water Level:</p>
+<div class="water-box">
+  <div id="waterBar" class="water-level">0%</div>
+</div>
+
 <button id="resetBtn" onclick="resetESP()">RESET ESP</button>
 
 <p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
@@ -69,10 +100,11 @@ const mqttStatusEl  = document.getElementById('mqttStatus');
 const espStatusEl   = document.getElementById('espStatus');
 const espIPEl       = document.getElementById('espIP');
 const espUptimeEl   = document.getElementById('espUptime');
+const waterBar      = document.getElementById('waterBar');
 const onBtn  = document.getElementById('onBtn');
 const offBtn = document.getElementById('offBtn');
 
-// ----------------- Motor button colors -----------------
+// ---------- Motor ----------
 function updateButtonColors(status) {
   motorStatusEl.innerText = status;
   if (status === 'ON') {
@@ -84,19 +116,17 @@ function updateButtonColors(status) {
   }
 }
 
-// ----------------- Send motor command -----------------
 function sendCommand(cmd) {
   if (client.connected) client.publish('motor/control', cmd);
 }
 
-// ----------------- Reset ESP -----------------
 function resetESP() {
   if (client.connected && confirm("Reset ESP?")) {
-    client.publish('esp/reset', 'RESET'); // matches ESP code
+    client.publish('esp/reset', 'RESET');
   }
 }
 
-// ----------------- MQTT Events -----------------
+// ---------- MQTT ----------
 client.on('connect', () => {
   mqttStatusEl.innerText = 'Connected';
   mqttStatusEl.style.color = 'limegreen';
@@ -105,29 +135,18 @@ client.on('connect', () => {
     'motor/status',
     'esp/status',
     'esp/ip',
-    'esp/uptime'
+    'esp/uptime',
+    'sensor/waterLevel'
   ]);
-});
-
-client.on('reconnect', () => {
-  mqttStatusEl.innerText = 'Reconnecting...';
-  mqttStatusEl.style.color = 'orange';
 });
 
 client.on('offline', () => {
   mqttStatusEl.innerText = 'Offline';
   mqttStatusEl.style.color = 'red';
-  // mark ESP offline if MQTT lost connection
   espStatusEl.innerText = 'OFFLINE';
   espStatusEl.className = 'offline';
 });
 
-client.on('error', () => {
-  mqttStatusEl.innerText = 'Error';
-  mqttStatusEl.style.color = 'red';
-});
-
-// ----------------- MQTT Messages -----------------
 client.on('message', (topic, message) => {
   const msg = message.toString();
 
@@ -141,6 +160,14 @@ client.on('message', (topic, message) => {
   if (topic === 'esp/ip') espIPEl.innerText = msg;
 
   if (topic === 'esp/uptime') espUptimeEl.innerText = msg;
+
+  if (topic === 'sensor/waterLevel') {
+    let level = parseInt(msg);
+    if (isNaN(level)) return;
+    level = Math.max(0, Math.min(100, level));
+    waterBar.style.width = level + '%';
+    waterBar.innerText = level + '%';
+  }
 });
 </script>
 
