@@ -55,6 +55,15 @@
     line-height: 30px;
     transition: width 0.4s;
   }
+
+  /* -------- Active Device Indicator -------- */
+  .device-info {
+    background: #e8f4f8;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 10px 0;
+    font-size: 16px;
+  }
 </style>
 </head>
 
@@ -66,9 +75,12 @@
 <button id="onBtn" onclick="sendCommand('ON')">ON</button>
 <button id="offBtn" onclick="sendCommand('OFF')">OFF</button>
 
-<hr>
+<!-- ✅ FIXED: Shows WHICH device is active -->
+<div class="device-info">
+  <strong>Active ESP:</strong> <span id="activeDevice">--</span> 
+  | Status: <span id="espStatus" class="offline">OFFLINE</span>
+</div>
 
-<p>ESP Status: <span id="espStatus" class="offline">OFFLINE</span></p>
 <p>ESP IP: <b id="espIP">--</b></p>
 <p>ESP Uptime: <b id="espUptime">--:--:--</b></p>
 
@@ -88,39 +100,53 @@ const options = {
   reconnectPeriod: 1000,
   clean: true,
   connectTimeout: 4000
-  // REMOVED will topic - not needed for dashboard
 };
 const client = mqtt.connect(broker, options);
 
+// DOM Elements
 const motorStatusEl = document.getElementById('motorStatus');
 const mqttStatusEl  = document.getElementById('mqttStatus');
 const espStatusEl   = document.getElementById('espStatus');
+const activeDeviceEl= document.getElementById('activeDevice');
 const espIPEl       = document.getElementById('espIP');
 const espUptimeEl   = document.getElementById('espUptime');
 const waterBar      = document.getElementById('waterBar');
-const onBtn  = document.getElementById('onBtn');
-const offBtn = document.getElementById('offBtn');
+const onBtn         = document.getElementById('onBtn');
+const offBtn        = document.getElementById('offBtn');
+
+// Track devices
+let devices = {};
+let lastActiveDevice = null;
 
 function updateButtonColors(status){
   motorStatusEl.innerText = status;
-  if(status==='ON'){ onBtn.style.background='limegreen'; offBtn.style.background='gray'; }
-  else if(status==='OFF'){ offBtn.style.background='tomato'; onBtn.style.background='gray'; }
+  if(status==='ON'){ 
+    onBtn.style.background='limegreen'; 
+    offBtn.style.background='gray'; 
+  } else if(status==='OFF'){ 
+    offBtn.style.background='tomato'; 
+    onBtn.style.background='gray'; 
+  }
 }
 
 function sendCommand(cmd){
-  if(client.connected) client.publish('motor/control', cmd);
+  if(client.connected) {
+    client.publish('motor/control', cmd);
+  } else {
+    alert("MQTT not connected!");
+  }
 }
 
 // ---------- MQTT EVENTS ----------
 client.on('connect', () => {
-  mqttStatusEl.innerText = 'Connected';
+  mqttStatusEl.innerText = 'Connected ✅';
   mqttStatusEl.style.color = 'limegreen';
   client.subscribe([
     'motor/status',
-    'esp/+/status',      // FIXED: Wildcard for esp/1234/status, esp/5678/status
-    'esp/ip',
-    'esp/uptime',
-    'sensor/waterLevel'
+    'sensor/waterLevel',
+    'esp/+/status',     // ✅ Motor ESP: esp/1234/status
+    'esp/+/ip',         // ✅ Motor ESP: esp/1234/ip  
+    'esp/+/uptime'      // ✅ Motor ESP: esp/1234/uptime
   ]);
 });
 
@@ -144,26 +170,54 @@ client.on('error', () => {
 client.on('message', (topic,message)=>{
   const msg = message.toString();
   
-  if(topic==='motor/status') updateButtonColors(msg);
-
-  // FIXED: Handle unique status topics esp/1234/status, esp/5678/status
-  if(topic.match(/^esp\/\d+\/status$/)) {
-    espStatusEl.innerText = msg;
-    espStatusEl.className = (msg==='ONLINE')?'online':'offline';
+  // Motor status
+  if(topic === 'motor/status') {
+    updateButtonColors(msg);
+    return;
   }
-
-  if(topic==='esp/ip') espIPEl.innerText = msg;
-
-  if(topic==='esp/uptime'){
-    espUptimeEl.innerText = msg;
-  }
-
-  if(topic==='sensor/waterLevel'){
+  
+  // Water level
+  if(topic === 'sensor/waterLevel') {
     let level = parseInt(msg);
-    if(isNaN(level)) return;
-    level = Math.max(0, Math.min(100, level));
-    waterBar.style.width = level + '%';
-    waterBar.innerText = level + '%';
+    if(!isNaN(level)) {
+      level = Math.max(0, Math.min(100, level));
+      waterBar.style.width = level + '%';
+      waterBar.innerText = level + '%';
+    }
+    return;
+  }
+  
+  // ✅ FIXED: Device status handling (MULTIPLE ESPs)
+  if(topic.match(/^esp\/\d+\/status$/)) {
+    // Extract device ID from topic: esp/1234/status → "1234"
+    const deviceMatch = topic.match(/esp\/(\d+)\/status/);
+    const deviceID = deviceMatch ? deviceMatch[1] : 'unknown';
+    
+    // Track device status
+    devices[deviceID] = msg;
+    lastActiveDevice = deviceID;
+    
+    // Update display for THIS device
+    espStatusEl.innerText = msg;
+    espStatusEl.className = (msg === 'ONLINE') ? 'online' : 'offline';
+    activeDeviceEl.innerText = `ESP_${deviceID}`;
+    
+    console.log(`Device ESP_${deviceID}: ${msg}`); // Debug
+  }
+  
+  // IP & Uptime (match active device)
+  if(topic.match(/^esp\/\d+\/(ip|uptime)$/)) {
+    const deviceMatch = topic.match(/esp\/(\d+)/);
+    const deviceID = deviceMatch ? deviceMatch[1] : 'unknown';
+    
+    // Only show if it's the active device
+    if(deviceID === lastActiveDevice) {
+      if(topic.match(/ip$/)) {
+        espIPEl.innerText = msg;
+      } else if(topic.match(/uptime$/)) {
+        espUptimeEl.innerText = msg;
+      }
+    }
   }
 });
 </script>
