@@ -70,6 +70,7 @@
 
 <p>ESP Status: <span id="espStatus" class="offline">OFFLINE</span></p>
 <p>ESP IP: <b id="espIP">--</b></p>
+<!-- FIXED: Now handles HH:MM:SS format from ESP -->
 <p>ESP Uptime: <b id="espUptime">--:--:--</b></p>
 
 <p>Water Level:</p>
@@ -153,13 +154,9 @@ client.on('message', (topic,message)=>{
 
   if(topic==='esp/ip') espIPEl.innerText = msg;
 
+  // FIXED: Parse HH:MM:SS format from ESP uptime
   if(topic==='esp/uptime'){
-    let totalSec = parseInt(msg);
-    let h = Math.floor(totalSec/3600);
-    let m = Math.floor((totalSec%3600)/60);
-    let s = totalSec%60;
-    espUptimeEl.innerText =
-      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    espUptimeEl.innerText = msg;  // Direct display - already formatted
   }
 
   if(topic==='sensor/waterLevel'){
