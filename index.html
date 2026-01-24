@@ -34,7 +34,6 @@
 
   #onBtn { background: gray; }
   #offBtn { background: gray; }
-  #resetBtn { background: #444; color: white; }
 
   .online { color: limegreen; font-weight: bold; }
   .offline { color: red; font-weight: bold; }
@@ -78,8 +77,6 @@
   <div id="waterBar" class="water-level">0%</div>
 </div>
 
-<button id="resetBtn" onclick="resetESP()">RESET ESP</button>
-
 <p>MQTT Status: <span id="mqttStatus">Disconnected</span></p>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -112,10 +109,6 @@ function updateButtonColors(status){
 
 function sendCommand(cmd){
   if(client.connected) client.publish('motor/control', cmd);
-}
-
-function resetESP(){
-  if(client.connected && confirm("Reset ESP?")) client.publish('esp/reset','RESET');
 }
 
 // ---------- MQTT EVENTS ----------
