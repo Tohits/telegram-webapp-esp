@@ -70,7 +70,6 @@
 
 <p>ESP Status: <span id="espStatus" class="offline">OFFLINE</span></p>
 <p>ESP IP: <b id="espIP">--</b></p>
-<!-- FIXED: Now handles HH:MM:SS format from ESP -->
 <p>ESP Uptime: <b id="espUptime">--:--:--</b></p>
 
 <p>Water Level:</p>
@@ -88,8 +87,8 @@ const options = {
   password: 'toh123@TOH',
   reconnectPeriod: 1000,
   clean: true,
-  connectTimeout: 4000,
-  will: { topic: 'esp/status', payload: 'OFFLINE', qos: 1, retain: true }
+  connectTimeout: 4000
+  // REMOVED will topic - not needed for dashboard
 };
 const client = mqtt.connect(broker, options);
 
@@ -118,7 +117,7 @@ client.on('connect', () => {
   mqttStatusEl.style.color = 'limegreen';
   client.subscribe([
     'motor/status',
-    'esp/status',
+    'esp/+/status',      // FIXED: Wildcard for esp/1234/status, esp/5678/status
     'esp/ip',
     'esp/uptime',
     'sensor/waterLevel'
@@ -144,19 +143,19 @@ client.on('error', () => {
 
 client.on('message', (topic,message)=>{
   const msg = message.toString();
-
+  
   if(topic==='motor/status') updateButtonColors(msg);
 
-  if(topic==='esp/status'){
+  // FIXED: Handle unique status topics esp/1234/status, esp/5678/status
+  if(topic.match(/^esp\/\d+\/status$/)) {
     espStatusEl.innerText = msg;
     espStatusEl.className = (msg==='ONLINE')?'online':'offline';
   }
 
   if(topic==='esp/ip') espIPEl.innerText = msg;
 
-  // FIXED: Parse HH:MM:SS format from ESP uptime
   if(topic==='esp/uptime'){
-    espUptimeEl.innerText = msg;  // Direct display - already formatted
+    espUptimeEl.innerText = msg;
   }
 
   if(topic==='sensor/waterLevel'){
