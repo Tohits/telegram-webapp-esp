@@ -6,78 +6,28 @@
 <title>3-Phase Motor Control Dashboard</title>
 
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    text-align: center;
-    background: #f4f4f9;
-    color: #333;
-  }
-  h2 { margin-top: 20px; }
-  p { font-size: 20px; }
-
-  button {
-    width: 170px;
-    height: 65px;
-    font-size: 22px;
-    margin: 10px;
-    border: none;
-    border-radius: 15px;
-    color: white;
-    cursor: pointer;
-    box-shadow: 0 5px #666;
-    transition: 0.2s;
-  }
-  button:active {
-    box-shadow: 0 2px #666;
-    transform: translateY(4px);
-  }
-
-  #onBtn { background: gray; }
-  #offBtn { background: gray; }
-
-  .online { color: limegreen; font-weight: bold; }
-  .offline { color: red; font-weight: bold; }
-
-  /* -------- Water Level -------- */
-  .water-box {
-    width: 260px;
-    margin: 15px auto;
-    background: #ddd;
-    border-radius: 15px;
-    overflow: hidden;
-  }
-  .water-level {
-    height: 30px;
-    width: 0%;
-    background: #2196f3;
-    color: white;
-    font-weight: bold;
-    line-height: 30px;
-    transition: width 0.4s;
-  }
-
-  /* -------- Active Device Indicator -------- */
-  .device-info {
-    background: #e8f4f8;
-    padding: 10px;
-    border-radius: 10px;
-    margin: 10px 0;
-    font-size: 16px;
-  }
+  body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f9; color: #333; }
+  h2 { margin-top: 20px; } p { font-size: 20px; }
+  button { width: 170px; height: 65px; font-size: 22px; margin: 10px; border: none; border-radius: 15px; color: white; cursor: pointer; box-shadow: 0 5px #666; transition: 0.2s; }
+  button:active { box-shadow: 0 2px #666; transform: translateY(4px); }
+  #onBtn { background: gray; } #offBtn { background: gray; }
+  .online { color: limegreen; font-weight: bold; } .offline { color: red; font-weight: bold; }
+  .water-box { width: 260px; margin: 15px auto; background: #ddd; border-radius: 15px; overflow: hidden; }
+  .water-level { height: 30px; width: 0%; background: #2196f3; color: white; font-weight: bold; line-height: 30px; transition: width 0.4s; }
+  .device-info { background: #e8f4f8; padding: 10px; border-radius: 10px; margin: 10px 0; font-size: 16px; }
 </style>
 </head>
 
 <body>
-
 <h2>3-Phase Motor Control</h2>
 
 <p>Motor Status: <b id="motorStatus">--</b></p>
 <button id="onBtn" onclick="sendCommand('ON')">ON</button>
 <button id="offBtn" onclick="sendCommand('OFF')">OFF</button>
 
-<!-- ✅ FIXED: Shows WHICH device is active -->
+<!-- ✅ MAC DEVICE TRACKER -->
 <div class="device-info">
-  <strong>Active ESP:</strong> <span id="activeDevice">--</span> 
+  <strong>Active Device:</strong> <span id="activeDevice">--</span> 
   | Status: <span id="espStatus" class="offline">OFFLINE</span>
 </div>
 
@@ -94,42 +44,38 @@
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
 const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
-const options = {
-  username: 'tohits',
-  password: 'toh123@TOH',
-  reconnectPeriod: 1000,
-  clean: true,
-  connectTimeout: 4000
-};
-const client = mqtt.connect(broker, options);
+const client = mqtt.connect(broker, {
+  username: 'tohits', password: 'toh123@TOH',
+  reconnectPeriod: 1000, clean: true, connectTimeout: 4000
+});
 
-// DOM Elements
+// Elements
 const motorStatusEl = document.getElementById('motorStatus');
-const mqttStatusEl  = document.getElementById('mqttStatus');
-const espStatusEl   = document.getElementById('espStatus');
-const activeDeviceEl= document.getElementById('activeDevice');
-const espIPEl       = document.getElementById('espIP');
-const espUptimeEl   = document.getElementById('espUptime');
-const waterBar      = document.getElementById('waterBar');
-const onBtn         = document.getElementById('onBtn');
-const offBtn        = document.getElementById('offBtn');
+const mqttStatusEl = document.getElementById('mqttStatus');
+const espStatusEl = document.getElementById('espStatus');
+const activeDeviceEl = document.getElementById('activeDevice');
+const espIPEl = document.getElementById('espIP');
+const espUptimeEl = document.getElementById('espUptime');
+const waterBar = document.getElementById('waterBar');
+const onBtn = document.getElementById('onBtn');
+const offBtn = document.getElementById('offBtn');
 
-// Track devices
-let devices = {};
-let lastActiveDevice = null;
+// Track MAC devices
+let macDevices = {};
+let lastActiveMAC = null;
 
-function updateButtonColors(status){
+function updateButtonColors(status) {
   motorStatusEl.innerText = status;
-  if(status==='ON'){ 
-    onBtn.style.background='limegreen'; 
-    offBtn.style.background='gray'; 
-  } else if(status==='OFF'){ 
-    offBtn.style.background='tomato'; 
-    onBtn.style.background='gray'; 
+  if(status === 'ON') { 
+    onBtn.style.background = 'limegreen'; 
+    offBtn.style.background = 'gray'; 
+  } else if(status === 'OFF') { 
+    offBtn.style.background = 'tomato'; 
+    onBtn.style.background = 'gray'; 
   }
 }
 
-function sendCommand(cmd){
+function sendCommand(cmd) {
   if(client.connected) {
     client.publish('motor/control', cmd);
   } else {
@@ -137,37 +83,21 @@ function sendCommand(cmd){
   }
 }
 
-// ---------- MQTT EVENTS ----------
+// MQTT Events
 client.on('connect', () => {
   mqttStatusEl.innerText = 'Connected ✅';
   mqttStatusEl.style.color = 'limegreen';
   client.subscribe([
     'motor/status',
     'sensor/waterLevel',
-    'esp/+/status',     // ✅ Motor ESP: esp/1234/status
-    'esp/+/ip',         // ✅ Motor ESP: esp/1234/ip  
-    'esp/+/uptime'      // ✅ Motor ESP: esp/1234/uptime
+    // ✅ MAC-BASED TOPICS (from your ESP code)
+    'devices/+/status',    // devices/a1b2c3d4e5f6/status
+    'devices/+/ip',        // devices/a1b2c3d4e5f6/ip
+    'devices/+/uptime'     // devices/a1b2c3d4e5f6/uptime
   ]);
 });
 
-client.on('reconnect', () => {
-  mqttStatusEl.innerText='Reconnecting...';
-  mqttStatusEl.style.color='orange';
-});
-
-client.on('offline', () => {
-  mqttStatusEl.innerText='Offline';
-  mqttStatusEl.style.color='red';
-  espStatusEl.innerText = 'OFFLINE';
-  espStatusEl.className='offline';
-});
-
-client.on('error', () => {
-  mqttStatusEl.innerText='Error';
-  mqttStatusEl.style.color='red';
-});
-
-client.on('message', (topic,message)=>{
+client.on('message', (topic, message) => {
   const msg = message.toString();
   
   // Motor status
@@ -187,40 +117,38 @@ client.on('message', (topic,message)=>{
     return;
   }
   
-  // ✅ FIXED: Device status handling (MULTIPLE ESPs)
-  if(topic.match(/^esp\/\d+\/status$/)) {
-    // Extract device ID from topic: esp/1234/status → "1234"
-    const deviceMatch = topic.match(/esp\/(\d+)\/status/);
-    const deviceID = deviceMatch ? deviceMatch[1] : 'unknown';
+  // ✅ FIXED: MAC-BASED DEVICE STATUS
+  if(topic.match(/^devices\/[0-9a-f]{12}\/status$/)) {
+    // Extract MAC: devices/a1b2c3d4e5f6/status → a1b2c3d4e5f6
+    const macMatch = topic.match(/devices\/([0-9a-f]{12})\/status/);
+    const macID = macMatch ? macMatch[1] : 'unknown';
     
-    // Track device status
-    devices[deviceID] = msg;
-    lastActiveDevice = deviceID;
+    // Track this MAC device
+    macDevices[macID] = msg;
+    lastActiveMAC = macID;
     
-    // Update display for THIS device
+    // Update display
     espStatusEl.innerText = msg;
     espStatusEl.className = (msg === 'ONLINE') ? 'online' : 'offline';
-    activeDeviceEl.innerText = `ESP_${deviceID}`;
+    activeDeviceEl.innerText = macID.toUpperCase();
     
-    console.log(`Device ESP_${deviceID}: ${msg}`); // Debug
+    console.log(`MAC ${macID}: ${msg}`);
   }
   
-  // IP & Uptime (match active device)
-  if(topic.match(/^esp\/\d+\/(ip|uptime)$/)) {
-    const deviceMatch = topic.match(/esp\/(\d+)/);
-    const deviceID = deviceMatch ? deviceMatch[1] : 'unknown';
+  // IP & Uptime for active MAC device
+  if(topic.match(/^devices\/[0-9a-f]{12}\/(ip|uptime)$/)) {
+    const macMatch = topic.match(/devices\/([0-9a-f]{12})/);
+    const macID = macMatch ? macMatch[1] : 'unknown';
     
-    // Only show if it's the active device
-    if(deviceID === lastActiveDevice) {
-      if(topic.match(/ip$/)) {
+    if(macID === lastActiveMAC) {
+      if(topic.endsWith('/ip')) {
         espIPEl.innerText = msg;
-      } else if(topic.match(/uptime$/)) {
+      } else if(topic.endsWith('/uptime')) {
         espUptimeEl.innerText = msg;
       }
     }
   }
 });
 </script>
-
 </body>
 </html>
