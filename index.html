@@ -96,8 +96,8 @@
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-    // --- CONNECT TO HIVEMQ (UPDATED METHOD) ---
-    // Using a full URL string is more reliable for browsers
+    // --- 1. ROBUST CONNECTION SETUP ---
+    // We use a single URL string for better browser compatibility
     const brokerUrl = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
     
     const options = {
@@ -126,7 +126,7 @@
         ip: document.getElementById('deviceIP')
     };
 
-    // --- LOGIC ---
+    // --- 2. EVENT LISTENERS ---
     client.on('connect', () => {
         console.log("Connected!");
         ui.mqtt.innerText = "Cloud Connected ☁️";
@@ -147,14 +147,18 @@
         if(parts.length < 3 || parts[0] !== 'devices') return;
         const deviceID = parts[1]; 
 
-        // Auto-Discovery
+        // Auto-Discovery: Fill box if empty
         if (!activeDeviceID) {
             activeDeviceID = deviceID;
             ui.input.value = activeDeviceID;
         }
 
-        // Only update UI if ID matches (Case Insensitive Check)
-        if (activeDeviceID && deviceID.toUpperCase() === activeDeviceID.toUpperCase()) {
+        // --- 3. SMART MATCHING FIX ---
+        // We convert the user's input to the correct format BEFORE checking
+        const target = getCleanID(); 
+
+        // If the message ID matches our Target (Case Insensitive)
+        if (target && deviceID.toUpperCase() === target) {
             handleData(parts, msg);
         }
     });
@@ -172,6 +176,7 @@
         else if (type === 'uptime') updateUptime(msg);
     }
 
+    // --- HELPERS ---
     function updateWater(val) {
         let v = parseInt(val);
         if(v > 100) v = 100; if(v < 0) v = 0;
@@ -196,10 +201,13 @@
         ui.uptime.innerText = `${h}h ${m}m`;
     }
 
-    // --- AUTO-CORRECT ID FORMAT ---
+    // --- 4. ID AUTO-CORRECTOR ---
+    // This turns "8c4f..." into "ESP_8C4F..." automatically
     function getCleanID() {
         if (!activeDeviceID) return null;
         let id = activeDeviceID.trim().toUpperCase();
+        
+        // If it looks like a MAC address (10+ chars) but missing prefix, add it.
         if (!id.startsWith("ESP_") && id.length >= 10) {
             id = "ESP_" + id;
         }
