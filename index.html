@@ -96,21 +96,21 @@
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-    // --- CONNECT TO HIVEMQ ---
+    // --- CONNECT TO HIVEMQ (UPDATED METHOD) ---
+    // Using a full URL string is more reliable for browsers
+    const brokerUrl = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
+    
     const options = {
-        protocol: 'wss',
-        host: '93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud',
-        port: 8884,
-        path: '/mqtt',
         username: 'tohits',
         password: 'toh123@TOH',
         clean: true,
         reconnectPeriod: 2000,
+        connectTimeout: 30 * 1000,
         rejectUnauthorized: false
     };
 
-    console.log("Connecting...");
-    const client = mqtt.connect(options);
+    console.log("Connecting to Cloud...");
+    const client = mqtt.connect(brokerUrl, options);
     
     let activeDeviceID = null;
 
@@ -128,9 +128,16 @@
 
     // --- LOGIC ---
     client.on('connect', () => {
+        console.log("Connected!");
         ui.mqtt.innerText = "Cloud Connected ☁️";
         ui.mqtt.style.color = "green";
         client.subscribe('devices/#');
+    });
+
+    client.on('error', (err) => {
+        console.error("Connection Error:", err);
+        ui.mqtt.innerText = "Error (Check Console)";
+        ui.mqtt.style.color = "red";
     });
 
     client.on('message', (topic, message) => {
@@ -140,7 +147,7 @@
         if(parts.length < 3 || parts[0] !== 'devices') return;
         const deviceID = parts[1]; 
 
-        // Auto-Discovery: If box is empty, fill it
+        // Auto-Discovery
         if (!activeDeviceID) {
             activeDeviceID = deviceID;
             ui.input.value = activeDeviceID;
@@ -189,11 +196,10 @@
         ui.uptime.innerText = `${h}h ${m}m`;
     }
 
-    // --- IMPORTANT: AUTO-CORRECT ID FORMAT ---
+    // --- AUTO-CORRECT ID FORMAT ---
     function getCleanID() {
         if (!activeDeviceID) return null;
         let id = activeDeviceID.trim().toUpperCase();
-        // If user typed just MAC (e.g. 8C4F...), add ESP_ prefix
         if (!id.startsWith("ESP_") && id.length >= 10) {
             id = "ESP_" + id;
         }
