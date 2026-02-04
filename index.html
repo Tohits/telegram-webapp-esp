@@ -40,7 +40,6 @@
         .label { font-size: 12px; color: #777; display: block; }
         .value { font-size: 16px; font-weight: bold; }
         
-        /* SYSTEM BUTTONS */
         .reboot-btn { background: #ff9800; color: white; border: none; padding: 5px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; float: right; }
         .update-btn { background: #2196f3; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-size: 12px; cursor: pointer; width: 100%; margin-top: 5px; }
         .url-input { width: 90%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px; font-size: 12px; }
@@ -97,9 +96,21 @@
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 <script>
-    const broker = 'wss://93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud:8884/mqtt';
-    const options = { username: 'tohits', password: 'toh123@TOH', reconnectPeriod: 2000, clean: true };
-    const client = mqtt.connect(broker, options);
+    // --- UPDATED CONNECTION LOGIC ---
+    const options = {
+        protocol: 'wss', // Secure WebSocket
+        host: '93bad3def29641e399de9a7b9c676613.s1.eu.hivemq.cloud',
+        port: 8884,
+        path: '/mqtt',
+        username: 'tohits',
+        password: 'toh123@TOH',
+        clean: true,
+        reconnectPeriod: 2000,
+        rejectUnauthorized: false
+    };
+
+    console.log("Connecting to MQTT...");
+    const client = mqtt.connect(options);
     
     let activeDeviceID = null;
 
@@ -115,10 +126,18 @@
         ip: document.getElementById('deviceIP')
     };
 
+    // --- EVENTS ---
     client.on('connect', () => {
+        console.log("Connected!");
         ui.mqtt.innerText = "Cloud Connected ☁️";
         ui.mqtt.style.color = "green";
         client.subscribe('devices/#');
+    });
+
+    client.on('error', (err) => {
+        console.error("MQTT Error:", err);
+        ui.mqtt.innerText = "Connection Error (See Console)";
+        ui.mqtt.style.color = "red";
     });
 
     client.on('message', (topic, message) => {
@@ -128,9 +147,11 @@
         if(parts.length < 3 || parts[0] !== 'devices') return;
         const deviceID = parts[1]; 
 
+        // Auto-Discovery
         if (!activeDeviceID) {
             activeDeviceID = deviceID;
             ui.input.value = activeDeviceID;
+            console.log("Found: " + deviceID);
         }
 
         if (deviceID === activeDeviceID) handleData(parts, msg);
@@ -143,7 +164,7 @@
         else if (type === 'sensor' && parts[3] === 'level') updateWater(msg);
         else if (type === 'status') {
             ui.status.innerText = msg;
-            ui.status.style.color = (msg === 'ONLINE') ? 'green' : (msg.includes('DOWNLOADING') ? 'blue' : 'red');
+            ui.status.style.color = (msg === 'ONLINE') ? 'green' : (msg.includes('DOWN') ? 'blue' : 'red');
         }
         else if (type === 'ip') ui.ip.innerText = msg;
         else if (type === 'uptime') updateUptime(msg);
@@ -180,5 +201,18 @@
 
     function sendReboot() {
         if (!activeDeviceID) return;
-        if(confirm("Restart device?")) {
-            client.publish(`devices/${
+        if(confirm("Restart Device?")) client.publish(`devices/${activeDeviceID}/cmd`, "REBOOT");
+    }
+
+    function sendUpdate() {
+        if (!activeDeviceID) return;
+        const url = document.getElementById('updateUrl').value.trim();
+        if(url === "") { alert("Enter URL first."); return; }
+        if(confirm("Update Firmware?")) client.publish(`devices/${activeDeviceID}/update`, url);
+    }
+
+    function setManualID(val) { activeDeviceID = val.trim(); }
+</script>
+
+</body>
+</html>
